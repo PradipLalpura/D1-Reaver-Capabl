@@ -6,52 +6,62 @@
 <title>REAVER — Universal Lead Intelligence</title>
 <meta name="description" content="One autonomous lead-intelligence agent for any legitimate target. Discover, verify, qualify, export.">
 <link rel="icon" href="/favicon.ico" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quantico:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div id="loader"><img src="/favicon.ico" alt="REAVER"><div class="bar"><i></i></div><small>Reaver</small></div>
-<main class="wrap">
-<nav class="nav"><img src="/favicon.ico" alt="REAVER mark"><b>REAVER</b><span class="sp"></span>
-<a class="link" href="#how">How it works</a><a class="link" href="#trust">Why trust it</a><a class="link" href="/playground">Playground</a></nav>
 
 <header class="hero">
-<div>
-<h1>Any target.<br><span class="gold">Verified leads.</span><br>One agent.</h1>
-<p>Describe what you want in plain words — bakeries in Ahmedabad, SaaS startups in India, vendors anywhere. REAVER discovers candidates across its source mesh, proves every claim with timestamped evidence, qualifies, deduplicates, and exports <b>CSV or JSON</b>.</p>
-<p><a class="btn" href="/playground">Open the Playground</a> <a class="btn ghost" href="#how">How it works</a></p>
-<p class="tick"><b>✓</b> No invented companies, contacts, or facts — missing evidence is declared missing.</p>
-<p class="tick"><b>✓</b> Bring your own model keys. They never leave the server.</p>
-</div>
-<img class="mark" src="/img/logo" alt="REAVER bolt">
+<svg class="bg" viewBox="0 0 600 800" aria-hidden="true"><g opacity="0.16"><path d="M360 40 L200 380 L330 380 L210 760 L470 320 L330 320 Z" fill="#15BCDF"/><path d="M420 120 L300 380 L400 380 L310 660 L520 340 L410 340 Z" fill="#16233d" opacity="0.5"/></g></svg>
+<div class="scrim"></div>
+<nav class="nav wrap">
+<span class="brand"><img src="/favicon.ico" alt="REAVER mark"><b>reaver</b></span>
+<span class="links"><a href="/">Home</a><a href="#about">About</a><a href="/playground">Playground</a></span>
+<span class="sp"></span>
+<a class="btn small contact" href="/playground">Contact us</a>
+<button class="burger" aria-label="menu" onclick="document.querySelector('.nav').classList.toggle('open')"><i></i><i></i><i></i></button>
+</nav>
+<h1><span>Discover</span><span>Verified</span><span>Leads</span><span class="ind">For</span><span class="ind">Your</span><span class="ind acc">Business</span></h1>
+<div class="cta"><a class="btn" href="/playground">Get started</a></div>
 </header>
 
-<section id="how">
+<section class="about" id="about">
+<div class="left">
+<h2>About<span class="ind">Reaver</span></h2>
+<p>Reaver is the autonomous lead-intelligence agent modern teams rely on. From multi-source discovery to evidence-backed qualification, it turns plain words into verified, deduplicated leads — any industry, any geography. Every claim cited, every verdict explained, zero surprises.</p>
+<p><a class="btn" href="/playground">Learn more</a></p>
+</div>
+<div class="right"><div class="panel">
+<h3>Proof, not promises</h3>
+<ul>
+<li><b>10</b> MCP tools — one engine, every AI host</li>
+<li><b>11</b> routed sources with fallbacks</li>
+<li><b>44 + 11</b> checks and evals green</li>
+<li><b>CSV / JSON</b> out, truth throughout</li>
+</ul>
+</div></div>
+</section>
+
+<main class="wrap">
+<section class="block">
 <h2 class="sec">Pipeline</h2>
 <div class="grid">
-<div class="card reveal"><h3>1 · Compile</h3><p>Your sentence becomes a structured target spec — geography, industry, size, signals, testable criteria. Optional business context sharpens buyer-fit.</p></div>
-<div class="card reveal"><h3>2 · Discover</h3><p>Multi-backend search mesh with ordered fallbacks. Pools grow to 2.5× asked; research runs in waves until the count fills.</p></div>
-<div class="card reveal"><h3>3 · Research</h3><p>Pages fetched through a robots.txt gate, cached, chunked into an evidence store with embeddings for citation retrieval.</p></div>
-<div class="card reveal"><h3>4 · Qualify</h3><p>Code-graded PASS / FAIL / UNKNOWN per criterion. Conflicts and stale facts become UNCERTAIN — never averaged into fake certainty.</p></div>
-<div class="card reveal"><h3>5 · Deliver</h3><p>Qualified plus capped uncertain leads ship with per-lead reasons; disqualified go to a rejected appendix with their FAIL reasons. CSV by default.</p></div>
-<div class="card reveal"><h3>6 · Refresh</h3><p>Reruns reuse fresh evidence and refetch stale pages — REFRESHED, FRESH, STALE, or GONE, each explained.</p></div>
+<div class="card reveal"><h3><span class="n">01</span> Compile</h3><p>Your sentence becomes a structured spec — geography, industry, size, signals, testable criteria. Optional business context sharpens buyer-fit.</p></div>
+<div class="card reveal"><h3><span class="n">02</span> Discover</h3><p>Search mesh with ordered fallbacks. Pools grow to 2.5× asked; research waves loop until the count fills or sources honestly exhaust.</p></div>
+<div class="card reveal"><h3><span class="n">03</span> Research</h3><p>Robots-gated fetches, cached pages, RAG passages with embeddings — every PASS cites its sources.</p></div>
+<div class="card reveal"><h3><span class="n">04</span> Qualify</h3><p>Code-graded PASS / FAIL / UNKNOWN. Conflicts and stale facts become UNCERTAIN, never averaged into fake certainty.</p></div>
+<div class="card reveal"><h3><span class="n">05</span> Deliver</h3><p>Qualified plus capped uncertain leads ship with per-lead reasons; disqualified land in a rejected appendix. CSV by default.</p></div>
+<div class="card reveal"><h3><span class="n">06</span> Refresh</h3><p>Reruns reuse fresh evidence and refetch stale pages — REFRESHED, FRESH, STALE, or GONE, each explained.</p></div>
 </div>
 </section>
-
-<section id="trust">
-<h2 class="sec">Why trust it</h2>
-<div class="grid">
-<div class="card reveal"><h3>Evidence, not vibes</h3><p>Every PASS cites retrieved passages. Remove the evidence and verdicts flip to UNKNOWN — the RAG is load-bearing, not decoration.</p></div>
-<div class="card reveal"><h3>Contradictions surfaced</h3><p>120 vs 400 employees is shown side-by-side with sources, not averaged. You see the disagreement.</p></div>
-<div class="card reveal"><h3>Compliant by construction</h3><p>robots.txt gates every fetch; auth walls are never bypassed; failures are reported with fallbacks, never invented around.</p></div>
-</div>
-</section>
-
-<section>
+<section class="block" style="text-align:center">
 <h2 class="sec">One engine, every host</h2>
-<p style="color:var(--muted)">The same MCP serves ChatGPT, Claude, OpenCode — and this Playground, which runs it on <b>your</b> keys and <b>your</b> models.</p>
+<p style="color:var(--gray)">The same MCP serves ChatGPT, Claude, OpenCode — and this Playground, on your keys and your models.</p>
 <p><a class="btn" href="/playground">Run it now</a></p>
 </section>
-<footer>REAVER · Capabl AI Hackathon 2026 · D1 — CSV or JSON out, truth throughout.</footer>
+<footer>REAVER · Capabl AI Hackathon 2026 · D1</footer>
 </main>
 <script src="/static/site.js"></script>
 </body>
