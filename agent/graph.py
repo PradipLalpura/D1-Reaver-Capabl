@@ -159,7 +159,7 @@ def prefilter_node(state: S) -> dict:
     return {**_step(state, "prefilter:%d" % len(kept)), "candidates": kept}
 
 
-def _extract(url: str, text: str, chain: list[tuple[str, str, str]] | None) -> dict:
+def extract_fields(url: str, text: str, chain: list[tuple[str, str, str]] | None) -> dict:
     try:
         raw = llm.chat_json(
             "Extract JSON {industry, country, city, employee_count, hiring, signals[],"
@@ -192,7 +192,7 @@ def research_node(state: S) -> dict:
             text = cached if isinstance(cached, str) else ""
         host = normalize_domain(cand["url"])
         tier = 1 if cand["domain"] and host == cand["domain"] else 4
-        fields = _extract(cand["url"], text, chain)
+        fields = extract_fields(cand["url"], text, chain)
         attrs: dict[str, list[dict]] = {}
         for attr in ("industry", "country", "city", "employee_count", "hiring"):
             value = str(fields.get(attr, "") or "").strip()
@@ -283,9 +283,13 @@ def export_node(state: S) -> dict:
     records = [LeadRecord.model_validate(v) for v in state["leads"]]
     fmt = state.get("output_format", "csv")
     data = to_csv(records) if fmt == "csv" else to_json(records)
+    conflicts = [{"lead": c["name"], "attribute": s["attribute"], "values": s.get("values", [])}
+                 for c in state.get("researched", []) for s in c.get("verification", [])
+                 if s.get("conflict")]
     return {**_step(state, "export:%s" % fmt),
             "result": {"ok": True, "format": fmt, "count": len(records), "data": data,
-                       "why": state.get("why", {}), "steps": state.get("steps", [])}}
+                       "why": state.get("why", {}), "conflicts": conflicts,
+                       "steps": state.get("steps", [])}}
 
 
 def _has_error(state: S) -> bool:

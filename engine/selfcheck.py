@@ -163,6 +163,10 @@ def main() -> None:
     check("ablation: cited PASS survives",
           kept[0].state.value == "PASS" and kept[0].citations == ["a#1"])
 
+    summary = summarize_attribute("size", [ev("size", "120"), ev("size", "400")])
+    check("summaries carry conflicting values", summary["values"] == ["120", "400"])
+    check("router stats recorded", isinstance(router.last_stats(), dict))
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

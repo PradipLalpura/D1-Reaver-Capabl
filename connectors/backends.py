@@ -184,11 +184,11 @@ def apify_run(actor_kind: str, run_input: dict) -> BackendResult:
                          note="actor %s, dataset items fetched once" % actor)
 
 
-def jina_fetch(url: str) -> BackendResult:
+def jina_fetch(url: str, force: bool = False) -> BackendResult:
     """Page text via Jina Reader. Robots gate is unconditional — no bypass parameter exists."""
     from data import cache as _cache
     key = _cache.make_key("page", url)
-    hit = _cache.get(key)
+    hit = None if force else _cache.get(key)
     if isinstance(hit, str) and hit:
         return BackendResult("jina", "OK", items=[{"url": url, "text": hit}],
                              note="cache hit")

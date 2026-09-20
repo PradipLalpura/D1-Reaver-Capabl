@@ -49,6 +49,20 @@ host model / playground BYOK keys
 LLM extracts and plans; code grades, merges, and exports. No evidence = UNKNOWN, conflict =
 UNCERTAIN, robots-blocked = skipped with reason.
 
+## HubSpot import (dry-tested shape)
+
+`export_leads` CSV columns map 1:1 to HubSpot company/contact properties:
+
+```text
+company→Name, domain→Website Domain, website→Website URL, city→City,
+country→Country, industry→Industry, employee_count→Employees,
+contact_name→First/Last Name (split on import), contact_email→Email
+```
+
+Import path: Contacts/Companies → Import → CSV → map the columns above →
+`lead_state`/`confidence`/`evidence_count` land in custom properties. No CRM sync in
+MVP — the file is the handoff, and it imports without column edits.
+
 ## Docs
 
 - Product/architecture brief: `D1_Universal_Lead_Intelligence_MCP_Ideation.md`

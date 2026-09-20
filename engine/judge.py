@@ -51,14 +51,16 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
                                 reason="no evidence", confidence=0.0)
 
     if kind == "location":
-        used = _values(attrs, "country", "city")
+        groups = [_values(attrs, "country"), _values(attrs, "city")]
+        used = groups[0] + groups[1]
         if not used:
             return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
                                     reason="no location evidence", confidence=0.0)
-        blocked = _conflict_reason(used)
-        if blocked:
-            return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
-                                    reason=blocked, confidence=0.0, evidence=used)
+        for group in groups:
+            blocked = _conflict_reason(group)
+            if blocked:  # conflict counts within one attribute; city+country complement, never contradict
+                return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
+                                        reason=blocked, confidence=0.0, evidence=used)
         haystack = " ".join(e.value.lower() for e in used)
         wants = [w for w in normalize_name(criterion).split() if len(w) > 2 and w not in STOPWORDS]
         if any(w in haystack for w in wants):

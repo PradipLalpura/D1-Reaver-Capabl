@@ -29,6 +29,7 @@ SEARCH_TTL = 6 * 3600
 
 _spent: dict[str, int] = defaultdict(int)
 _last: dict[str, str] = {}
+_stats: dict[str, dict] = {}
 
 
 def spent(backend: str) -> int:
@@ -37,6 +38,11 @@ def spent(backend: str) -> int:
 
 def last_state() -> dict[str, str]:
     return dict(_last)
+
+
+def last_stats() -> dict[str, dict]:
+    """Last-known per-backend outcome + latency. Memory only, never probed — quota-safe."""
+    return {k: dict(v) for k, v in _stats.items()}
 
 
 def _call(backend: str, query: str, n: int, **kw):
@@ -58,6 +64,8 @@ def _call(backend: str, query: str, n: int, **kw):
     if backend in METERED_BUDGET and out.status == "OK":
         _spent[backend] += 1
     _last[backend] = out.status + ": " + out.note
+    _stats[backend] = {"status": out.status, "ms": out.latency_ms, "note": out.note,
+                       "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     return {"status": out.status, "items": out.items, "note": out.note, "ms": out.latency_ms}
 
 

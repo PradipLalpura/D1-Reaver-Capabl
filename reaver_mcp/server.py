@@ -184,9 +184,66 @@ def deduplicate_leads(leads: list[dict]) -> dict:
 
 
 @mcp.tool()
-def refresh_leads(leads: list[dict]) -> dict:
-    """Stale-evidence recheck against the mesh. Full refresh lands in Phase 7."""
-    return _not_built("refresh_leads", 7, "cache + mesh refresh")
+def refresh_leads(leads: list[dict], criteria: list[str] = []) -> dict:
+    """Stale-evidence recheck: forced refetch, change detection, re-judge. WIRED (Phase 7).
+
+    Per lead: REFRESHED (facts or verdict changed) / FRESH (confirmed same) /
+    STALE (page gone, search fallback still mentions it) / GONE (no trace anywhere).
+    """
+    from agent.graph import extract_fields
+    from engine.judge import judge_lead
+    records, failure = _leads(leads, "refresh_leads")
+    if failure:
+        return failure
+    assert records is not None
+    report = []
+    for lead in records:
+        url = (lead.website or lead.domain).strip()
+        if not url:
+            report.append({"name": lead.name, "status": "STALE",
+                           "note": "no URL to recheck", "changed": []})
+            continue
+        try:
+            target = canonical_url(url)
+        except ValueError:
+            report.append({"name": lead.name, "status": "STALE",
+                           "note": "URL unusable", "changed": []})
+            continue
+        fetched = backends.jina_fetch(target, force=True)
+        if fetched.status != "OK":
+            fallback = router.route("web_search", lead.name, n=3)
+            if fallback["ok"] and fallback["items"]:
+                report.append({"name": lead.name, "status": "STALE",
+                               "note": "page %s; search still mentions it" % fetched.note,
+                               "changed": []})
+            else:
+                report.append({"name": lead.name, "status": "GONE",
+                               "note": "page %s; no search trace" % fetched.note,
+                               "changed": []})
+            continue
+        fields = extract_fields(target, fetched.items[0]["text"], None)
+        now = datetime.now(timezone.utc)
+        attrs: dict[str, list[Evidence]] = {}
+        for attr in ("industry", "country", "city", "employee_count"):
+            value = str(fields.get(attr, "") or "").strip()
+            if value and value.lower() != "unknown":
+                attrs[attr] = [Evidence(attribute=attr, value=value[:500], source=target,
+                                        tier=1, observed_at=now, confidence=0.8)]
+        changed = [a for a, v in (("industry", lead.industry), ("country", lead.country),
+                                  ("city", lead.city), ("employee_count", lead.employee_count))
+                   if a in attrs and attrs[a][0].value.lower() != (v or "").lower()]
+        entry: dict = {"name": lead.name, "status": "REFRESHED" if changed else "FRESH",
+                       "changed": changed, "observed_at": now.isoformat()}
+        if criteria:
+            status, confidence, details = judge_lead(criteria[:20], attrs)
+            entry["state"], entry["confidence"] = status, confidence
+            entry["criteria"] = [d.model_dump(mode="json") for d in details]
+            if not changed and status == lead.state.value:
+                entry["status"] = "FRESH"
+            else:
+                entry["status"] = "REFRESHED"
+        report.append(entry)
+    return {"ok": True, "tool": "refresh_leads", "refreshed": report}
 
 
 @mcp.tool()

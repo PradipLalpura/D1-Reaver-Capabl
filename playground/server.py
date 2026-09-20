@@ -135,11 +135,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._page("playground.html")
         if path == "/api/health":
             from mesh.doctor import registry
+            from mesh.router import last_stats
             from connectors.keys import keys, KEY_NAMES
+            stats = last_stats()
             out = []
             for entry in registry():
                 present = bool(keys(*KEY_NAMES.get(entry["name"], ()))) if entry["name"] in KEY_NAMES else None
-                out.append({**entry, "key_present": present})
+                out.append({**entry, "key_present": present,
+                            "last": stats.get(entry["name"], {"status": "UNTESTED"})})
             return self._json(200, {"ok": True, "sources": out})
         if path.startswith("/api/download/"):
             return self._download(path.rsplit("/", 1)[-1])
@@ -260,6 +263,7 @@ class Handler(BaseHTTPRequestHandler):
                     payload = {"node": "result", "ok": True, "format": result["format"],
                                "count": result["count"], "steps": result.get("steps", []),
                                "why": result.get("why", {}), "rows": _preview(result),
+                               "conflicts": result.get("conflicts", []),
                                "download": token}
                 elif result is not None:
                     payload = {"node": "result", "ok": False, "error": result.get("error", "run failed"),

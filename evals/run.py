@@ -85,4 +85,38 @@ check("conflict -> not false certainty",
       verdicts[0].state.value == "UNKNOWN" and "conflict" in verdicts[0].reason
       and len(verdicts[0].evidence) == 2)
 
+# 6. refresh path: forced refetch re-judges (stubbed fetch, zero network)
+from reaver_mcp.server import refresh_leads as _refresh_tool  # noqa: E402
+_refresh_fn = getattr(_refresh_tool, "fn", _refresh_tool)
+real_fetch = backends.jina_fetch
+backends.jina_fetch = lambda url, force=False: BackendResult(
+    "jina", "OK", items=[{"url": url, "text": "Moti Bakery is a bakery in Ahmedabad, India."}])
+try:
+    rep = _refresh_fn([{"name": "Moti Bakery", "domain": "motibakery.com",
+                        "industry": "travel", "country": "France"}],
+                      ["located in India", "operates in bakery"])
+    entry = rep["refreshed"][0]
+    check("refresh detects change + re-judges",
+          rep["ok"] and entry["status"] == "REFRESHED"
+          and set(entry["changed"]) >= {"industry", "country"}
+          and entry["state"] == "QUALIFIED")
+    backends.jina_fetch = lambda url, force=False: BackendResult("jina", "FAIL", note="killed")
+    real_route = router.route
+    router.route = lambda *a, **k: {"ok": False, "fallbacks": [], "items": []}
+    try:
+        rep = _refresh_fn([{"name": "Ghost Co", "domain": "ghost.invalid"}])
+    finally:
+        router.route = real_route
+    check("dead page with no trace -> GONE", rep["refreshed"][0]["status"] == "GONE")
+finally:
+    backends.jina_fetch = real_fetch
+
+# 7. HubSpot-mappable columns present
+import csv as _csv, io as _io  # noqa: E402
+rows = list(_csv.DictReader(_io.StringIO(
+    _export_fn([{"name": "Acme", "domain": "acme.com"}])["data"])))
+check("hubspot columns present",
+      all(k in rows[0] for k in ("company", "domain", "city", "country", "industry",
+                                 "contact_name", "contact_email")))
+
 print("EVALS PASS %d/%d" % (passed, passed))

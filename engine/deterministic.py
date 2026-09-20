@@ -74,16 +74,17 @@ def summarize_attribute(
     """Honesty gate: empty → unsupported, conflict → conflict, all-stale → stale. Never invents."""
     if not evidence:
         return {"attribute": attribute, "supported": False, "conflict": False,
-                "stale": False, "reason": "no evidence", "evidence_count": 0}
+                "stale": False, "reason": "no evidence", "evidence_count": 0, "values": []}
     conflict, distinct = _conflicts([e.value for e in evidence])
     if conflict:
         return {"attribute": attribute, "supported": False, "conflict": True,
                 "stale": False, "reason": "conflicting evidence: " + " vs ".join(distinct[:3]),
-                "evidence_count": len(evidence)}
+                "evidence_count": len(evidence), "values": distinct[:3]}
     stale = all(age_days(e, now) > ttl_days for e in evidence)
     return {"attribute": attribute, "supported": not stale, "conflict": False,
             "stale": stale, "reason": "stale evidence" if stale else "supported",
-            "evidence_count": len(evidence)}
+            "evidence_count": len(evidence),
+            "values": sorted({e.value for e in evidence})[:3]}
 
 
 HUBSPOT_HEADERS = ["company", "domain", "website", "city", "country", "industry",
