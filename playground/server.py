@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import secrets
 import threading
 import time
@@ -24,6 +25,9 @@ SESSIONS: dict[str, dict] = {}
 DOWNLOADS: dict[str, dict] = {}
 RUN_COUNT: dict[str, list[float]] = {}
 GUARD = threading.Lock()
+
+# single source for UI assets: repo-root static/ (Vercel serves it, Python serves it locally)
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 
 
 def new_sid() -> str:
@@ -152,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _page(self, name: str) -> None:
         import os
-        target = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", name)
+        target = os.path.join(STATIC_DIR, name)
         try:
             with open(target, "rb") as handle:
                 self._send(200, handle.read(), "text/html")
@@ -165,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"ok": False, "error": "unknown path"})
         ctype = "application/javascript" if name.endswith(".js") else "text/css"
         try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", name), "rb") as handle:
+            with open(os.path.join(STATIC_DIR, name), "rb") as handle:
                 self._send(200, handle.read(), ctype)
         except OSError:
             self._json(404, {"ok": False, "error": "asset missing"})
@@ -288,10 +292,11 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser(prog="reaver-playground")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print("REAVER playground on http://127.0.0.1:%d" % args.port, flush=True)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    print("REAVER playground on http://%s:%d" % (args.host, args.port), flush=True)
     server.serve_forever()
 
 

@@ -95,16 +95,27 @@ MVP — the file is the handoff, and it imports without column edits.
 - Product/architecture brief: `D1_Universal_Lead_Intelligence_MCP_Ideation.md`
 - Build plan + changelog: `PHASES.md`
 
-## Deploy (public HTTPS for ChatGPT / Claude-remote + shared Playground link)
+## Deploy (single domain: Vercel static + Railway Python)
 
-Run two services from this repo (free-tier friendly: Railway recommended — auto TLS,
-env dashboard, Python native; Render/Fly.io work the same way):
+```text
+reaver.antarik.co/            Vercel (static landing + UI assets, free CDN)
+reaver.antarik.co/playground
+reaver.antarik.co/api/*       Railway `playground` service (Python, same code)
+reaver.antarik.co/mcp/        Railway `reaver-mcp` service (bearer-guarded)
+```
+
+Glue is `vercel.json` rewrites (same-origin throughout, so no CORS work).
+Replace `REAVER_PLAYGROUND_HOST` / `REAVER_MCP_HOST` with the two Railway
+hostnames when the services exist.
 
 | Service | Start command | Env |
 |---|---|---|
-| `playground` | `python -m playground.server --port $PORT` | all `.env` keys as secrets |
+| `playground` | `python -m playground.server --host 0.0.0.0 --port $PORT` | all `.env` keys as secrets |
 | `reaver-mcp` | `python -m reaver_mcp.server --transport http --host 0.0.0.0 --port $PORT` | same keys + `REAVER_MCP_TOKEN` (generate: `python -c "import secrets;print(secrets.token_hex(24))"`) |
 
-Then: ChatGPT connectors / Claude `mcp_servers` → `https://<reaver-mcp-host>/mcp/`
-with the token; judges use `https://<playground-host>/playground` with their own BYOK keys.
+Then: Cloudflare `reaver` CNAME → Vercel (`cname.vercel-dns.com`); Vercel project
+from this repo. ChatGPT connectors / Claude `mcp_servers` → `https://reaver.antarik.co/mcp/`
+with the token; judges use `https://reaver.antarik.co/playground` with their own BYOK keys.
 Zero-deploy interim: `cloudflared tunnel --url http://127.0.0.1:8000` and paste the URL.
+Stream fallback: if Vercel truncates multi-minute SSE/MCP streams, point
+`app-`/`mcp-` subdomains straight at Railway (DNS-only, no code change).

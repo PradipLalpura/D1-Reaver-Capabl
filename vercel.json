@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/", "destination": "/static/landing.html" },
+    { "source": "/playground", "destination": "https://REAVER_PLAYGROUND_HOST/playground" },
+    { "source": "/api/:path*", "destination": "https://REAVER_PLAYGROUND_HOST/api/:path*" },
+    { "source": "/mcp/:path*", "destination": "https://REAVER_MCP_HOST/mcp/:path*" }
+  ]
+}
