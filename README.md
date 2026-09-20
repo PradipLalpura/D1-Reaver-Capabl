@@ -94,3 +94,17 @@ MVP — the file is the handoff, and it imports without column edits.
 
 - Product/architecture brief: `D1_Universal_Lead_Intelligence_MCP_Ideation.md`
 - Build plan + changelog: `PHASES.md`
+
+## Deploy (public HTTPS for ChatGPT / Claude-remote + shared Playground link)
+
+Run two services from this repo (free-tier friendly: Railway recommended — auto TLS,
+env dashboard, Python native; Render/Fly.io work the same way):
+
+| Service | Start command | Env |
+|---|---|---|
+| `playground` | `python -m playground.server --port $PORT` | all `.env` keys as secrets |
+| `reaver-mcp` | `python -m reaver_mcp.server --transport http --host 0.0.0.0 --port $PORT` | same keys + `REAVER_MCP_TOKEN` (generate: `python -c "import secrets;print(secrets.token_hex(24))"`) |
+
+Then: ChatGPT connectors / Claude `mcp_servers` → `https://<reaver-mcp-host>/mcp/`
+with the token; judges use `https://<playground-host>/playground` with their own BYOK keys.
+Zero-deploy interim: `cloudflared tunnel --url http://127.0.0.1:8000` and paste the URL.
