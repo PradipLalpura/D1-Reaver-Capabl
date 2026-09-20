@@ -3,31 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>REAVER Playground (BYOK)</title>
+<title>REAVER Playground (BYOK — any provider)</title>
+<link rel="icon" href="/favicon.ico" type="image/png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div id="loader"><img src="/favicon.ico" alt="REAVER"><div class="bar"><i></i></div><small>Reaver</small></div>
 <main class="wrap">
-<h1>REAVER Playground</h1>
-<p class="tag">BYOK only — your keys run in server memory for 30 minutes, then vanish. <button id="clear" type="button">Clear keys</button></p>
+<nav class="nav"><img src="/favicon.ico" alt="REAVER mark"><b>REAVER</b><span class="sp"></span>
+<a class="link" href="/">Home</a></nav>
+<h1>Playground</h1>
+<p style="color:var(--muted)">BYOK — any OpenAI-compatible provider, or Anthropic. Keys live in server memory for 30 minutes, then vanish. <button id="clear" type="button" class="btn ghost">Clear keys</button></p>
+
 <section>
-<h2>1. Models</h2>
+<h2 class="sec">1 · Models</h2>
 <div class="models">
-<div><h3>Primary</h3>
+<div class="card"><h3>Primary</h3>
 <label>Provider <select id="pprov"></select></label>
+<label class="base" style="display:none">Base URL <input id="pbase" placeholder="https://your-host/v1"></label>
 <label>Model <input id="pmodel" value=""></label>
 <label>Key <input id="pkey" type="password" autocomplete="off"></label></div>
-<div><h3>Fallback</h3>
+<div class="card"><h3>Fallback</h3>
 <label>Provider <select id="fprov"></select></label>
+<label class="base" style="display:none">Base URL <input id="fbase" placeholder="https://your-host/v1"></label>
 <label>Model <input id="fmodel" value=""></label>
 <label>Key <input id="fkey" type="password" autocomplete="off"></label></div>
 </div>
-<button id="save" type="button">Save keys</button> <span id="keystate"></span>
+<button id="save" type="button" class="btn">Save keys</button> <span id="keystate"></span>
 </section>
+
 <section>
-<h2>2. Target</h2>
+<h2 class="sec">2 · Target</h2>
 <textarea id="req" rows="4">Find 10 bakeries in Ahmedabad, India, in the food/bakery business.</textarea>
-<details><summary>Your business (optional — sharper buyer-fit when filled)</summary>
+<details><summary>Your business (optional — sharper buyer-fit)</summary>
 <label>Business <input id="bname" placeholder="e.g. CrustEquip"></label>
 <label>You sell <input id="sells" placeholder="e.g. commercial ovens to bakeries"></label>
 <label>Ideal buyer <input id="buyer" placeholder="e.g. retail bakeries"></label>
@@ -35,27 +43,32 @@
 <label>Count <input id="count" type="number" value="10" min="1" max="50"></label>
 <label><input type="radio" name="fmt" value="csv" checked> CSV</label>
 <label><input type="radio" name="fmt" value="json"> JSON</label>
-<button id="run" type="button">Run</button>
+<button id="run" type="button" class="btn">Run</button>
 </section>
+
 <section>
-<h2>3. Progress</h2>
+<h2 class="sec">3 · Progress</h2>
 <ol id="steps"></ol>
 </section>
+
 <section>
-<h2>4. Leads</h2>
+<h2 class="sec">4 · Leads</h2>
 <div id="shortfall"></div>
 <div id="conflicts"></div>
 <div id="leads"></div>
-<p><a id="dl" href="#" style="display:none">Download full dataset</a></p>
+<p><a id="dl" class="btn" href="#" style="display:none">Download full dataset</a></p>
 <h3>Rejected (with reasons — never counted as delivered)</h3>
 <div id="rejected"></div>
 <p><small id="quota"></small></p>
 </section>
+
 <section>
-<h2>Sources</h2>
+<h2 class="sec">Sources</h2>
 <div id="health"><small>loading…</small></div>
 </section>
+<footer>Keys never leave this server · verdicts cite evidence · <a href="/">home</a></footer>
 </main>
+<script src="/static/site.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

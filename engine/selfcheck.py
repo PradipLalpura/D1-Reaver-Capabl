@@ -125,6 +125,15 @@ def main() -> None:
           valid_slot({"provider": "groq", "model": "m", "key": "short"}) is None)
     slot = valid_slot({"provider": "Groq", "model": "m", "key": "k" * 16})
     check("slot normalized", slot is not None and slot[0] == "groq")
+    check("custom needs https base",
+          valid_slot({"provider": "custom", "model": "m", "key": "k" * 16,
+                      "base_url": "http://x.example"}) is None)
+    check("custom https accepted",
+          valid_slot({"provider": "custom", "model": "m", "key": "k" * 16,
+                      "base_url": "https://x.example/v1"}) == ("custom", "m", "k" * 16, "https://x.example/v1"))
+    from provider.llm import _chain
+    chained = _chain([("custom", "m", "k" * 16, "https://x.example/v1"), ("nope", "m", "k" * 16)])
+    check("chain keeps valid custom only", chained == [("custom", "m", "k" * 16, "https://x.example/v1")])
     RUN_COUNT.pop("selfcheck-ip", None)
     for _ in range(10):
         check_rate("selfcheck-ip")

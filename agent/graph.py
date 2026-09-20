@@ -52,9 +52,9 @@ def _step(state: S, label: str) -> dict:
     return {"steps": [*state.get("steps", []), label]}
 
 
-def _chain_of(state: S) -> list[tuple[str, str, str]] | None:
+def _chain_of(state: S) -> list[tuple] | None:
     raw = state.get("llm_chain") or []
-    out = [tuple(c) for c in raw if len(c) == 3]
+    out = [tuple(c) for c in raw if len(c) in (3, 4)]
     return out or None  # None → provider defaults (env → free-tier chain)
 
 

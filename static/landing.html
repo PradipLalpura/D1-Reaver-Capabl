@@ -4,25 +4,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>REAVER — Universal Lead Intelligence</title>
+<meta name="description" content="One autonomous lead-intelligence agent for any legitimate target. Discover, verify, qualify, export.">
+<link rel="icon" href="/favicon.ico" type="image/png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<div id="loader"><img src="/favicon.ico" alt="REAVER"><div class="bar"><i></i></div><small>Reaver</small></div>
 <main class="wrap">
-<h1>REAVER</h1>
-<p class="tag">One autonomous lead-intelligence agent for any legitimate target — any industry, any geography, any user.</p>
-<p>Describe what you want in plain words. REAVER discovers candidates, researches them, verifies every claim against evidence, qualifies, deduplicates, and exports <b>CSV or JSON</b>.</p>
-<ul>
-<li>No invented companies, contacts, or facts — missing evidence is declared missing.</li>
-<li>Every verdict cites its sources, with freshness and confidence.</li>
-<li>Bring your own model keys. Yours never leave the server.</li>
-</ul>
-<p><a class="btn" href="/playground">Open the Playground</a></p>
-<h2>How it works</h2>
-<ol>
-<li>You describe the target and pick primary + fallback models.</li>
-<li>The same REAVER MCP used by ChatGPT, Claude, and OpenCode runs your request.</li>
-<li>You watch each step, inspect the evidence, and download the dataset.</li>
-</ol>
+<nav class="nav"><img src="/favicon.ico" alt="REAVER mark"><b>REAVER</b><span class="sp"></span>
+<a class="link" href="#how">How it works</a><a class="link" href="#trust">Why trust it</a><a class="link" href="/playground">Playground</a></nav>
+
+<header class="hero">
+<div>
+<h1>Any target.<br><span class="gold">Verified leads.</span><br>One agent.</h1>
+<p>Describe what you want in plain words — bakeries in Ahmedabad, SaaS startups in India, vendors anywhere. REAVER discovers candidates across its source mesh, proves every claim with timestamped evidence, qualifies, deduplicates, and exports <b>CSV or JSON</b>.</p>
+<p><a class="btn" href="/playground">Open the Playground</a> <a class="btn ghost" href="#how">How it works</a></p>
+<p class="tick"><b>✓</b> No invented companies, contacts, or facts — missing evidence is declared missing.</p>
+<p class="tick"><b>✓</b> Bring your own model keys. They never leave the server.</p>
+</div>
+<img class="mark" src="/img/logo" alt="REAVER bolt">
+</header>
+
+<section id="how">
+<h2 class="sec">Pipeline</h2>
+<div class="grid">
+<div class="card reveal"><h3>1 · Compile</h3><p>Your sentence becomes a structured target spec — geography, industry, size, signals, testable criteria. Optional business context sharpens buyer-fit.</p></div>
+<div class="card reveal"><h3>2 · Discover</h3><p>Multi-backend search mesh with ordered fallbacks. Pools grow to 2.5× asked; research runs in waves until the count fills.</p></div>
+<div class="card reveal"><h3>3 · Research</h3><p>Pages fetched through a robots.txt gate, cached, chunked into an evidence store with embeddings for citation retrieval.</p></div>
+<div class="card reveal"><h3>4 · Qualify</h3><p>Code-graded PASS / FAIL / UNKNOWN per criterion. Conflicts and stale facts become UNCERTAIN — never averaged into fake certainty.</p></div>
+<div class="card reveal"><h3>5 · Deliver</h3><p>Qualified plus capped uncertain leads ship with per-lead reasons; disqualified go to a rejected appendix with their FAIL reasons. CSV by default.</p></div>
+<div class="card reveal"><h3>6 · Refresh</h3><p>Reruns reuse fresh evidence and refetch stale pages — REFRESHED, FRESH, STALE, or GONE, each explained.</p></div>
+</div>
+</section>
+
+<section id="trust">
+<h2 class="sec">Why trust it</h2>
+<div class="grid">
+<div class="card reveal"><h3>Evidence, not vibes</h3><p>Every PASS cites retrieved passages. Remove the evidence and verdicts flip to UNKNOWN — the RAG is load-bearing, not decoration.</p></div>
+<div class="card reveal"><h3>Contradictions surfaced</h3><p>120 vs 400 employees is shown side-by-side with sources, not averaged. You see the disagreement.</p></div>
+<div class="card reveal"><h3>Compliant by construction</h3><p>robots.txt gates every fetch; auth walls are never bypassed; failures are reported with fallbacks, never invented around.</p></div>
+</div>
+</section>
+
+<section>
+<h2 class="sec">One engine, every host</h2>
+<p style="color:var(--muted)">The same MCP serves ChatGPT, Claude, OpenCode — and this Playground, which runs it on <b>your</b> keys and <b>your</b> models.</p>
+<p><a class="btn" href="/playground">Run it now</a></p>
+</section>
+<footer>REAVER · Capabl AI Hackathon 2026 · D1 — CSV or JSON out, truth throughout.</footer>
 </main>
+<script src="/static/site.js"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ PROVIDERS = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     "openai": "https://api.openai.com/v1/chat/completions",
     "anthropic": "https://api.anthropic.com/v1/messages",
+    "custom": "",  # user-supplied https base URL, OpenAI-compatible path appended
 }
 
 KEY_NAMES_LLM = {
@@ -21,6 +22,7 @@ KEY_NAMES_LLM = {
     "gemini": KEY_NAMES["gemini"],
     "openai": KEY_NAMES["openai"],
     "anthropic": KEY_NAMES["anthropic"],
+    "custom": (),
 }
 
 DEFAULT_MODEL = {
@@ -29,6 +31,7 @@ DEFAULT_MODEL = {
     "gemini": "gemini-2.5-flash",
     "openai": "gpt-4o-mini",
     "anthropic": "claude-haiku-4-5",
+    "custom": "",
 }
 # ponytail: free-tier model IDs rot without notice (both defaults died once already);
 # env REAVER_PRIMARY_MODEL/_FALLBACK_MODEL overrides; a /models refresh belongs in Phase 7 doctor
@@ -38,10 +41,23 @@ class LLMError(Exception):
     pass
 
 
-def _chain(explicit: list[tuple[str, str, str]] | None = None) -> list[tuple[str, str, str]]:
-    """(provider, model, key) primary → fallback. Explicit session chain wins; else env; else free-tier defaults."""
+def _chain(explicit: list[tuple] | None = None) -> list[tuple]:
+    """(provider, model, key[, base]) primary → fallback. Explicit session chain wins; else env; else free-tier defaults."""
     if explicit:
-        return [(p, m, k) for p, m, k in explicit if p in PROVIDERS and m and k]
+        out = []
+        for item in explicit:
+            if len(item) == 3:
+                p, m, k, base = (*item, "")
+            elif len(item) == 4:
+                p, m, k, base = item
+            else:
+                continue
+            if p not in PROVIDERS or not m or not k:
+                continue
+            if p == "custom" and not base.startswith("https://"):
+                continue
+            out.append((p, m, k, base))
+        return out
     out = []
     # ponytail: 3-deep default chain (groq → gemini → openrouter) because free tiers exhaust mid-run;
     # 4th+ providers only via explicit session/env config
@@ -58,11 +74,16 @@ def _chain(explicit: list[tuple[str, str, str]] | None = None) -> list[tuple[str
         model = os.environ.get(prefix + "_MODEL", "").strip() or DEFAULT_MODEL[provider]
         key = os.environ.get(prefix + "_KEY", "").strip() or next(iter(keys(*KEY_NAMES_LLM[provider])), "")
         if key:
-            out.append((provider, model, key))
+            out.append((provider, model, key, ""))
     return out
 
 
-def _ask(provider: str, model: str, key: str, system: str, user: str, temperature: float) -> str:
+def _ask(provider: str, model: str, key: str, system: str, user: str, temperature: float,
+         base: str = "") -> str:
+    if provider == "custom":
+        url = base.rstrip("/") + "/chat/completions"  # any OpenAI-compatible endpoint
+    else:
+        url = PROVIDERS[provider]
     if provider == "anthropic":
         res = http.call(PROVIDERS[provider], method="POST",
                         headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
@@ -72,7 +93,7 @@ def _ask(provider: str, model: str, key: str, system: str, user: str, temperatur
             raise LLMError("http %s" % res["http"])
         blocks = (http.json_body(res) or {}).get("content", [])
         return "".join(b.get("text", "") for b in blocks if isinstance(b, dict))
-    res = http.call(PROVIDERS[provider], method="POST", headers={"Authorization": "Bearer " + key},
+    res = http.call(url, method="POST", headers={"Authorization": "Bearer " + key},
                     payload={"model": model, "temperature": temperature,
                              "messages": [{"role": "system", "content": system},
                                           {"role": "user", "content": user}]})
@@ -82,12 +103,13 @@ def _ask(provider: str, model: str, key: str, system: str, user: str, temperatur
 
 
 def chat_json(system: str, user: str, *, temperature: float = 0.0,
-              chain: list[tuple[str, str, str]] | None = None) -> dict | list:
+              chain: list[tuple] | None = None) -> dict | list:
     """One JSON object back, or raise. Primary → fallback; every failure recorded in the message."""
     failures = []
-    for provider, model, key in _chain(chain):
+    for provider, model, key, *rest in _chain(chain):
+        base = rest[0] if rest else ""
         try:
-            text = _ask(provider, model, key, system, user, temperature).strip()
+            text = _ask(provider, model, key, system, user, temperature, base).strip()
         except LLMError as exc:
             failures.append("%s:%s %s" % (provider, model, exc))
             continue

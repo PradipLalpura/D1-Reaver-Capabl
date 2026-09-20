@@ -19,7 +19,7 @@ SESSION_TTL = 30 * 60
 DOWNLOAD_TTL = 5 * 60
 RUNS_PER_HOUR = 10
 MAX_BODY = 32 * 1024
-PROVIDERS = ("groq", "gemini", "openrouter", "openai", "anthropic")
+PROVIDERS = ("groq", "gemini", "openrouter", "openai", "anthropic", "custom")
 
 SESSIONS: dict[str, dict] = {}
 DOWNLOADS: dict[str, dict] = {}
@@ -42,15 +42,19 @@ def sweep() -> None:
         DOWNLOADS.pop(token, None)
 
 
-def valid_slot(slot: object) -> tuple[str, str, str] | None:
+def valid_slot(slot: object) -> tuple[str, str, str, str] | None:
+    """(provider, model, key, base_url). Custom endpoints must be https; base travels, never logs."""
     if not isinstance(slot, dict):
         return None
     provider = str(slot.get("provider", "")).lower()
     model = str(slot.get("model", "")).strip()
     key = str(slot.get("key", "")).strip()
+    base = str(slot.get("base_url", "")).strip().rstrip("/")
     if provider not in PROVIDERS or not (1 <= len(model) <= 100) or len(key) < 8:
         return None
-    return provider, model, key
+    if provider == "custom" and not base.startswith("https://"):
+        return None
+    return provider, model, key, base
 
 
 def check_rate(ip: str) -> bool:
@@ -137,6 +141,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._page("landing.html")
         if path == "/playground":
             return self._page("playground.html")
+        if path == "/favicon.ico":
+            return self._brand("Favicon.png", "image/png")
+        if path == "/img/logo":
+            return self._brand("Primary logo without BG.png", "image/png")
         if path == "/api/health":
             from mesh.doctor import registry
             from mesh.router import last_stats
@@ -152,7 +160,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._download(path.rsplit("/", 1)[-1])
         if path.startswith("/static/"):
             return self._static(path.rsplit("/", 1)[-1])
+        if "text/html" in (self.headers.get("Accept") or ""):
+            return self._not_found_page()
         return self._json(404, {"ok": False, "error": "unknown path"})
+
+    def _brand(self, name: str, ctype: str) -> None:
+        """Serve brand art from logos/ — strict allowlist, no path traversal possible."""
+        import os
+        if name not in ("Favicon.png", "Primary logo without BG.png", "Primary logo.png"):
+            return self._json(404, {"ok": False, "error": "unknown path"})
+        base = os.path.join(os.path.dirname(STATIC_DIR), "logos")
+        try:
+            with open(os.path.join(base, name), "rb") as handle:
+                self._send(200, handle.read(), ctype)
+        except OSError:
+            self._json(404, {"ok": False, "error": "asset missing"})
+
+    def _not_found_page(self) -> None:
+        import os
+        try:
+            with open(os.path.join(STATIC_DIR, "404.html"), "rb") as handle:
+                self._send(404, handle.read(), "text/html")
+        except OSError:
+            self._json(404, {"ok": False, "error": "unknown path"})
 
     def _page(self, name: str) -> None:
         import os
@@ -165,7 +195,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, name: str) -> None:
         import os
-        if name not in ("app.js", "style.css"):
+        if name not in ("app.js", "site.js", "style.css"):
+            if "text/html" in (self.headers.get("Accept") or ""):
+                return self._not_found_page()
             return self._json(404, {"ok": False, "error": "unknown path"})
         ctype = "application/javascript" if name.endswith(".js") else "text/css"
         try:

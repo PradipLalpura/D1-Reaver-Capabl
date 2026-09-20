@@ -1,10 +1,14 @@
-const PROVIDERS = [["groq","openai/gpt-oss-20b"],["gemini","gemini-2.5-flash"],["openrouter","meta-llama/llama-3.1-8b-instruct"],["openai","gpt-4o-mini"],["anthropic","claude-haiku-4-5"]];
+const PROVIDERS = [["groq","openai/gpt-oss-20b"],["gemini","gemini-2.5-flash"],["openrouter","qwen/qwen3.8-27b:free"],["openai","gpt-4o-mini"],["anthropic","claude-haiku-4-5"],["custom",""]];
 let sid = null;
-function fill(sel, def){ const el = document.getElementById(sel); PROVIDERS.forEach(([p,m])=>{ const o=document.createElement("option"); o.value=p; o.textContent=p; el.appendChild(o); }); }
+function fill(sel, def){ const el = document.getElementById(sel); PROVIDERS.forEach(([p,m])=>{ const o=document.createElement("option"); o.value=p; o.textContent=p==="custom"?"custom endpoint…":p; el.appendChild(o); }); }
 fill("pprov"); fill("fprov");
 document.getElementById("pprov").value = "groq";
 document.getElementById("fprov").value = "gemini";
-function syncModels(){ document.getElementById("pmodel").placeholder = PROVIDERS.find(p=>p[0]===document.getElementById("pprov").value)[1]; document.getElementById("fmodel").placeholder = PROVIDERS.find(p=>p[0]===document.getElementById("fprov").value)[1]; }
+function syncModels(){ const p=document.getElementById("pprov").value, f=document.getElementById("fprov").value;
+  document.getElementById("pmodel").placeholder = (PROVIDERS.find(x=>x[0]===p)||["","model id"])[1]||"model id";
+  document.getElementById("fmodel").placeholder = (PROVIDERS.find(x=>x[0]===f)||["","model id"])[1]||"model id";
+  document.getElementById("pbase").closest("label").style.display = p==="custom"?"block":"none";
+  document.getElementById("fbase").closest("label").style.display = f==="custom"?"block":"none"; }
 document.getElementById("pprov").onchange = syncModels; document.getElementById("fprov").onchange = syncModels; syncModels();
 async function api(path, body, method){ const r = await fetch(path,{method:method||"POST",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):null}); return r.json(); }
 (async ()=>{ sid = (await api("/api/session", null)).session_id;
@@ -16,9 +20,9 @@ async function api(path, body, method){ const r = await fetch(path,{method:metho
   }catch(e){ health.innerHTML = "<small>health unavailable</small>"; }
 })();
 document.getElementById("save").onclick = async ()=>{
+  const slot = (prov,model,base,key)=>({provider:prov.value,model:model.value||model.placeholder,key:key.value,base_url:base.value});
   const r = await api("/api/keys",{session_id:sid,
-    primary:{provider:pprov.value,model:pmodel.value||pmodel.placeholder,key:pkey.value},
-    fallback:{provider:fprov.value,model:fmodel.value||fmodel.placeholder,key:fkey.value}});
+    primary:slot(pprov,pmodel,pbase,pkey), fallback:slot(fprov,fmodel,fbase,fkey)});
   keystate.textContent = r.ok ? "keys stored server-side ("+r.primary[0]+" / "+r.fallback[0]+")" : "error: "+r.error;
   pkey.value = ""; fkey.value = "";
 };
