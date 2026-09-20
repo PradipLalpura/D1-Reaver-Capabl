@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REAVER Playground (BYOK)</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="wrap">
+<h1>REAVER Playground</h1>
+<p class="tag">BYOK only — your keys run in server memory for 30 minutes, then vanish. <button id="clear" type="button">Clear keys</button></p>
+<section>
+<h2>1. Models</h2>
+<div class="models">
+<div><h3>Primary</h3>
+<label>Provider <select id="pprov"></select></label>
+<label>Model <input id="pmodel" value=""></label>
+<label>Key <input id="pkey" type="password" autocomplete="off"></label></div>
+<div><h3>Fallback</h3>
+<label>Provider <select id="fprov"></select></label>
+<label>Model <input id="fmodel" value=""></label>
+<label>Key <input id="fkey" type="password" autocomplete="off"></label></div>
+</div>
+<button id="save" type="button">Save keys</button> <span id="keystate"></span>
+</section>
+<section>
+<h2>2. Target</h2>
+<textarea id="req" rows="4">Find 10 bakeries in Ahmedabad, India, in the food/bakery business.</textarea>
+<label>Count <input id="count" type="number" value="10" min="1" max="50"></label>
+<label><input type="radio" name="fmt" value="csv" checked> CSV</label>
+<label><input type="radio" name="fmt" value="json"> JSON</label>
+<button id="run" type="button">Run</button>
+</section>
+<section>
+<h2>3. Progress</h2>
+<ol id="steps"></ol>
+</section>
+<section>
+<h2>4. Leads</h2>
+<div id="leads"></div>
+<p><a id="dl" href="#" style="display:none">Download full dataset</a></p>
+</section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

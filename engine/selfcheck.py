@@ -119,6 +119,27 @@ def main() -> None:
     state, _, _ = judge_lead(["located in France", "operates in bakery"], attrs)
     check("hard mismatch disqualifies", state == "DISQUALIFIED")
 
+    from playground.server import RUN_COUNT, SESSIONS, _preview, check_rate, new_sid, valid_slot
+    check("bad slot rejected", valid_slot({"provider": "nope", "model": "m", "key": "k" * 8}) is None)
+    check("short key rejected",
+          valid_slot({"provider": "groq", "model": "m", "key": "short"}) is None)
+    slot = valid_slot({"provider": "Groq", "model": "m", "key": "k" * 16})
+    check("slot normalized", slot is not None and slot[0] == "groq")
+    RUN_COUNT.pop("selfcheck-ip", None)
+    for _ in range(10):
+        check_rate("selfcheck-ip")
+    check("rate limit trips", check_rate("selfcheck-ip") is False)
+    RUN_COUNT.pop("selfcheck-ip", None)
+    sid = new_sid()
+    SESSIONS[sid] = {"created": 0.0, "primary": None, "fallback": None, "lock": None}
+    from playground import server as _pg
+    _pg.sweep()
+    check("expired sessions purged", sid not in SESSIONS)
+    check("short sids unique", new_sid() != new_sid())
+    preview = _preview({"format": "csv",
+                        "data": 'company,domain\n"Acme, Inc",acme.com\n'})
+    check("preview parses quoted csv", preview and preview[0]["company"] == "Acme, Inc")
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

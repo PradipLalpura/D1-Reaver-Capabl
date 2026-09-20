@@ -31,12 +31,14 @@ class S(TypedDict, total=False):
     request: str
     desired_count: int
     output_format: str
+    llm_chain: list
     spec: dict
     queries: list[str]
     candidates: list[dict]
     researched: list[dict]
     verdicts: list[dict]
     leads: list[dict]
+    why: dict
     result: dict
     steps: list[str]
     error: str
@@ -44,6 +46,12 @@ class S(TypedDict, total=False):
 
 def _step(state: S, label: str) -> dict:
     return {"steps": [*state.get("steps", []), label]}
+
+
+def _chain_of(state: S) -> list[tuple[str, str, str]] | None:
+    raw = state.get("llm_chain") or []
+    out = [tuple(c) for c in raw if len(c) == 3]
+    return out or None  # None → provider defaults (env → free-tier chain)
 
 
 def _coerce_spec(raw: object) -> dict | None:
@@ -77,7 +85,8 @@ def compile_node(state: S) -> dict:
               ' "operates in bakery"]. Unknown fields become "" or []. Request: ' + state["request"])
     for attempt in range(2):
         try:
-            spec = _coerce_spec(llm.chat_json("Return ONLY the JSON object.", prompt))
+            spec = _coerce_spec(llm.chat_json("Return ONLY the JSON object.", prompt,
+                                              chain=_chain_of(state)))
         except Exception:
             spec = None
         if spec and spec["criteria"]:
@@ -89,7 +98,7 @@ def plan_node(state: S) -> dict:
     spec = state["spec"]
     try:
         raw = llm.chat_json("Write 3-6 web search queries to find candidates. Return ONLY {queries[]}.",
-                            str({k: v for k, v in spec.items() if v}))
+                            str({k: v for k, v in spec.items() if v}), chain=_chain_of(state))
         queries = [q for q in raw.get("queries", []) if isinstance(q, str)][:MAX_QUERIES]
     except Exception:
         queries = ["%s %s" % (spec.get("industry", ""), spec.get("geography", ""))]
@@ -150,13 +159,13 @@ def prefilter_node(state: S) -> dict:
     return {**_step(state, "prefilter:%d" % len(kept)), "candidates": kept}
 
 
-def _extract(url: str, text: str) -> dict:
+def _extract(url: str, text: str, chain: list[tuple[str, str, str]] | None) -> dict:
     try:
         raw = llm.chat_json(
             "Extract JSON {industry, country, city, employee_count, hiring, signals[],"
             ' page_type}. page_type is one of business|directory|article|unknown: the page itself,'
             " not what it mentions. Missing fields become empty strings.",
-            text[:3000])
+            text[:3000], chain=chain)
         return raw if isinstance(raw, dict) else {}
     except Exception:
         return {}
@@ -165,6 +174,7 @@ def _extract(url: str, text: str) -> dict:
 def research_node(state: S) -> dict:
     import time as _time
     now = datetime.now(timezone.utc).isoformat()
+    chain = _chain_of(state)
     researched = []
     for index, cand in enumerate(state["candidates"]):
         if index:
@@ -182,7 +192,7 @@ def research_node(state: S) -> dict:
             text = cached if isinstance(cached, str) else ""
         host = normalize_domain(cand["url"])
         tier = 1 if cand["domain"] and host == cand["domain"] else 4
-        fields = _extract(cand["url"], text)
+        fields = _extract(cand["url"], text, chain)
         attrs: dict[str, list[dict]] = {}
         for attr in ("industry", "country", "city", "employee_count", "hiring"):
             value = str(fields.get(attr, "") or "").strip()
@@ -234,7 +244,8 @@ def qualify_node(state: S) -> dict:
                          "evidence_count": sum(len(v) for v in cand["attrs"].values()),
                          "sources": [cand["url"]],
                          "criteria": [d.model_dump(mode="json") for d in details]})
-    return {**_step(state, "qualify:%d" % len(verdicts)), "verdicts": verdicts}
+    return {**_step(state, "qualify:%d" % len(verdicts)), "verdicts": verdicts,
+            "why": {v["domain"] or v["name"]: v["criteria"] for v in verdicts}}
 
 
 def dedupe_node(state: S) -> dict:
@@ -244,8 +255,16 @@ def dedupe_node(state: S) -> dict:
                           confidence=v["confidence"], evidence_count=v["evidence_count"],
                           sources=v["sources"]) for v in state["verdicts"]]
     merged = merge_leads(records)
+    why = state.get("why", {})
+    merged_why = {}
+    for record in merged:
+        seen: dict[str, dict] = {}
+        for key in (record.domain, record.name):
+            for item in why.get(key, []):
+                seen.setdefault(item["criterion"], item)
+        merged_why[record.domain or record.name] = list(seen.values())
     return {**_step(state, "dedupe:%d->%d" % (len(records), len(merged))),
-            "leads": [m.model_dump(mode="json") for m in merged]}
+            "leads": [m.model_dump(mode="json") for m in merged], "why": merged_why}
 
 
 def export_node(state: S) -> dict:
@@ -254,7 +273,7 @@ def export_node(state: S) -> dict:
     data = to_csv(records) if fmt == "csv" else to_json(records)
     return {**_step(state, "export:%s" % fmt),
             "result": {"ok": True, "format": fmt, "count": len(records), "data": data,
-                       "steps": state.get("steps", [])}}
+                       "why": state.get("why", {}), "steps": state.get("steps", [])}}
 
 
 def _has_error(state: S) -> bool:
@@ -297,12 +316,13 @@ def _app():
     return open_app()
 
 
-def run_prospect(request: str, desired_count: int = 20, output_format: str = "csv") -> dict:
+def run_prospect(request: str, desired_count: int = 20, output_format: str = "csv",
+                 llm_chain: list | None = None) -> dict:
     """End-to-end run. Thread id = request hash, so reruns resume from checkpoint + cache."""
     from data.cache import make_key
     config = {"configurable": {"thread_id": make_key("prospect", request, desired_count)}}
     initial: S = {"request": request, "desired_count": desired_count,
-                  "output_format": output_format, "steps": []}
+                  "output_format": output_format, "llm_chain": llm_chain or [], "steps": []}
     with _app() as app:
         final = app.invoke(initial, config)
     if final.get("error"):
@@ -312,3 +332,26 @@ def run_prospect(request: str, desired_count: int = 20, output_format: str = "cs
     result["steps"] = final.get("steps", [])
     result["tool"] = "prospect"
     return result
+
+
+def stream_prospect(request: str, desired_count: int = 20, output_format: str = "csv",
+                    llm_chain: list | None = None):
+    """Yields real node-completion events ({node, steps}), then the final result dict. No fabricated progress."""
+    from data.cache import make_key
+    config = {"configurable": {"thread_id": make_key("prospect", request, desired_count)}}
+    initial: S = {"request": request, "desired_count": desired_count,
+                  "output_format": output_format, "llm_chain": llm_chain or [], "steps": []}
+    with _app() as app:
+        for chunk in app.stream(initial, config):
+            for node, update in chunk.items():
+                yield {"node": node, "steps": (update or {}).get("steps", [])}
+        final = app.get_state(config).values
+    if final.get("error"):
+        yield {"node": "result",
+               "result": {"ok": False, "tool": "prospect", "error": final["error"],
+                          "steps": final.get("steps", [])}}
+    else:
+        result = dict(final.get("result", {}))
+        result["steps"] = final.get("steps", [])
+        result["tool"] = "prospect"
+        yield {"node": "result", "result": result}

@@ -25,6 +25,23 @@ def keys(*names: str) -> list[str]:
     return [value for name in names if (value := os.environ.get(name, "").strip())]
 
 
+KEY_NAMES = {
+    "tavily": ("TAVILY_PRIMARY_KEY", "TAVILY_FALLBACK_KEY"),
+    "serper": ("SERPER_PRIMARY_KEY", "SERPER_FALLBACK_KEY"),
+    "serpapi": ("SERP_PRIMARY_KEY", "SERP_FALLBACK_KEY"),
+    "exa": ("EXA_PRIMARY_KEY", "EXA_FALLBACK_KEY"),
+    "github": ("GITHUB_ACCESS_TOKEN",),
+    "apollo": ("APOLLO_API_KEY",),
+    "hunter": ("HUNTER_API_KEY",),
+    "apify": ("APIFY_PRIMARY_KEY", "APIFY_FALLBACK_KEY", "APIFY_FALLBACK_KEY_2"),
+    "groq": ("GROQ_API_KEY",),
+    "openrouter": ("OPENROUTER_API_KEY",),
+    "gemini": ("GEMINI_API_KEY",),
+    "openai": ("OPENAI_API_KEY",),
+    "anthropic": ("ANTHROPIC_API_KEY",),
+}
+
+
 @dataclass
 class BackendResult:
     backend: str
