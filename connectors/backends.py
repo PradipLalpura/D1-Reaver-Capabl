@@ -149,7 +149,7 @@ def hunter_domain(domain: str, n: int = 3) -> BackendResult:
 
 
 APIFY_ALLOWLIST = {
-    "maps": "apify/google-maps-scraper",
+    "maps": "compass/crawler-google-places",
     "crawler": "apify/website-content-crawler",
 }
 # ponytail: 2 actors; more only after a demo target proves unreachable without them
@@ -174,14 +174,24 @@ def apify_run(actor_kind: str, run_input: dict) -> BackendResult:
     dataset = (data.get("data") or {}).get("defaultDatasetId", "")
     if not dataset:
         return BackendResult("apify", "FAIL", note="no dataset id")
+    import time as _time  # ponytail: bounded poll (12x10s); webhook callbacks only if runs routinely exceed it
+    status, waited = "", 0
+    while waited < 120:
+        _time.sleep(10)
+        waited += 10
+        state = http.call("https://api.apify.com/v2/actor-runs/%s?token=%s" % (run_id, key))
+        status = ((http.json_body(state) or {}).get("data") or {}).get("status", "")
+        if status in ("SUCCEEDED", "FAILED", "TIMED-OUT", "ABORTED"):
+            break
+    if status != "SUCCEEDED":
+        return BackendResult("apify", "FAIL", note="run %s after %ds" % (status or "unfinished", waited))
     items_url = "https://api.apify.com/v2/datasets/%s/items?token=%s&limit=20" % (dataset, key)
-    # ponytail: single immediate fetch, no polling loop; SUCCEEDED-or-empty is reported, long runs surface as empty + note
     got = http.call(items_url, timeout=30)
     items = http.json_body(got) or []
     return BackendResult("apify", "OK" if got["http"] == 200 else "FAIL",
                          items=items if isinstance(items, list) else [],
                          latency_ms=started.get("ms", 0) + got.get("ms", 0),
-                         note="actor %s, dataset items fetched once" % actor)
+                         note="actor %s, %d items" % (actor, len(items) if isinstance(items, list) else 0))
 
 
 def jina_fetch(url: str, force: bool = False) -> BackendResult:

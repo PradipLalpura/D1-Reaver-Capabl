@@ -368,6 +368,20 @@ def enrich_node(state: S) -> dict:
                 country = (local["items"][0].get("title", "").split(",") or [""])[-1].strip()
                 if country:
                     cand["attrs"].setdefault("country", [_gap_evidence("country", country, "osm", 3, 0.4)])
+        if not (set(cand["attrs"]) & {"country", "city"}) and spec.get("geography"):
+            # last resort: metered maps actor (budget-gated in router), max 3 places
+            maps = router.route("structured", cand["name"], actor_kind="maps", run_input={
+                "searchStringsArray": ["%s %s" % (cand["name"], spec["geography"])],
+                "maxCrawledPlacesPerSearch": 3})
+            if maps["ok"] and maps["items"]:
+                first = maps["items"][0]
+                city = str(first.get("city", "")).strip()
+                addr = str(first.get("address", "")).strip()
+                if city:
+                    cand["attrs"].setdefault("city", [_gap_evidence("city", city, "apify-maps", 3, 0.5)])
+                if addr and "country" not in cand["attrs"]:
+                    cand["attrs"].setdefault("country", [_gap_evidence(
+                        "country", addr.split(",")[-1].strip(), "apify-maps", 3, 0.4)])
         if tech_target and "industry" in missing:
             tech = router.route("tech", cand["name"], n=3)
             if tech["ok"]:

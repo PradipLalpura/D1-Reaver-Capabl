@@ -197,10 +197,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, name: str) -> None:
         import os
-        if name not in ("app.js", "site.js", "mcp.js", "style.css"):
+        if name not in ("app.js", "site.js", "mcp.js", "style.css", "favicon.png", "logo.png"):
             if "text/html" in (self.headers.get("Accept") or ""):
                 return self._not_found_page()
             return self._json(404, {"ok": False, "error": "unknown path"})
+        ctype = {"js": "application/javascript", "css": "text/css",
+                 "png": "image/png"}.get(name.rsplit(".", 1)[-1], "application/octet-stream")
         ctype = "application/javascript" if name.endswith(".js") else "text/css"
         try:
             with open(os.path.join(STATIC_DIR, name), "rb") as handle:
