@@ -36,6 +36,46 @@ const cio = new IntersectionObserver(es => es.forEach(e => {
 }), {threshold: .4});
 document.querySelectorAll("[data-count]").forEach(el => cio.observe(el));
 
+// illustrative run transcript: real engine step names, looped demo (labeled on-page)
+(() => {
+  const screen = document.getElementById("term-screen");
+  if (!screen) return;
+  const lines = [
+    ["dim", "$ reaver prospect \"20 bakeries in Ahmedabad\""],
+    ["", "compile:ok · 3 criteria"],
+    ["", "plan:6 queries"],
+    ["ok", "discover:41 via tavily+serper+serpapi"],
+    ["", "research:9 new · verify:ok"],
+    ["ok", "qualify:+15 · dedupe:15->14"],
+    ["warn", "deliver 12 · reject 1 · shortfall 8"],
+    ["ok", "export:csv ✓"],
+  ];
+  let i = 0;
+  setInterval(() => {
+    const [cls, text] = lines[i % lines.length];
+    if (i % lines.length === 0) screen.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "ln " + cls;
+    div.textContent = text;
+    screen.appendChild(div);
+    i++;
+  }, 900);
+})();
+
+// strike rail buttons
+document.getElementById("rail-l")?.addEventListener("click", () =>
+  document.getElementById("rail")?.scrollBy({left: -350, top: 0, behavior: "smooth"}));
+document.getElementById("rail-r")?.addEventListener("click", () =>
+  document.getElementById("rail")?.scrollBy({left: 350, top: 0, behavior: "smooth"}));
+
+// verdict tabs
+document.querySelectorAll(".vtab").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".vtab").forEach(b => b.classList.remove("on"));
+  document.querySelectorAll(".vpane").forEach(p => p.classList.remove("on"));
+  btn.classList.add("on");
+  document.getElementById("v-" + btn.dataset.v)?.classList.add("on");
+}));
+
 // magnetic CTAs (hover-only, no cursor replacement)
 if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
   document.querySelectorAll("[data-mag]").forEach(el => {

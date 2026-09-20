@@ -5,38 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>REAVER — Forged Lead Intelligence</title>
 <meta name="description" content="One autonomous lead-intelligence weapon for any legitimate target. Discover, verify, qualify, export.">
-<link rel="icon" href="/favicon.ico" type="image/png">
+<link rel="icon" href="/static/favicon.png" type="image/png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <canvas id="stars"></canvas>
-<div id="loader"><img src="/favicon.ico" alt="REAVER"><div class="bar"><i></i></div><small id="forge-word">Heating</small></div>
+<div id="loader"><img src="/static/favicon.png" alt="REAVER"><div class="bar"><i></i></div><small id="forge-word">Heating</small></div>
 
 <header class="hero wrap">
-<nav class="nav"><img class="mark" src="/favicon.ico" alt="REAVER mark"><b>Reaver</b><span class="sp"></span>
+<nav class="nav"><img class="mark" src="/static/favicon.png" alt="REAVER mark"><b>Reaver</b><span class="sp"></span>
 <a class="link" href="#strikes">Strikes</a><a class="link" href="#arsenal">MCP</a><a class="link" href="#proof">Proof</a><a class="link" href="/playground">Playground</a>
-<button class="theme-btn" data-theme-btn type="button">◐ Theme</button></nav><p class="kicker">Autonomous lead intelligence · D1</p>
+<button class="theme-btn" data-theme-btn type="button">◐ Theme</button></nav>
+<p class="kicker">Autonomous lead intelligence · D1</p>
+<div class="bento">
+<div>
 <h1><span class="row"><i>Forged</i></span><span class="row"><i class="cut">Leads.</i></span><span class="row"><i class="gold">Zero misses.</i></span></h1>
 <div class="slash"></div>
 <p class="sub">Name any legitimate target — bakeries in Ahmedabad, SaaS startups across India, vendors anywhere. <b>REAVER</b> hunts candidates across its source mesh, proves every claim with timestamped evidence, qualifies without mercy, and exports <b>CSV or JSON</b>.</p>
 <div class="cta-row"><a class="btn" href="/playground" data-mag>Whet the blade</a><a class="btn ghost" href="#strikes" data-mag>See the strikes</a></div>
-<img class="mark" src="/img/logo" alt="REAVER bolt">
+<div class="mini-stats"><div><b>10</b><span>MCP tools</span></div><div><b>11</b><span>Sources</span></div><div><b>72</b><span>Checks green</span></div></div>
+</div>
+<div class="term" aria-label="Illustrative run transcript">
+<div class="bar"><i></i><i></i><i></i><span>reaver · live engine</span></div>
+<div class="screen" id="term-screen"></div>
+</div>
+</div>
 </header>
 
 <div class="marquee"><div>&nbsp;Discover <b>✦</b> Verify <b>✦</b> Qualify <b>✦</b> Deduplicate <b>✦</b> Export <b>✦</b> Discover <b>✦</b> Verify <b>✦</b> Qualify <b>✦</b> Deduplicate <b>✦</b> Export <b>✦</b>&nbsp;</div></div>
 
 <main class="wrap">
 <section class="block" id="strikes">
-<h2 class="sec">The strike sequence</h2>
+<h2 class="sec">The strike sequence — drag</h2>
 <h2 class="big">Six cuts.<br>No wasted motion.</h2>
-<div class="grid">
-<div class="strike reveal" data-n="01"><h3><span class="n">I.</span> Compile</h3><p>Your sentence becomes a battle plan — geography, industry, size, signals, testable criteria. Business context sharpens buyer-fit.</p></div>
-<div class="strike reveal" data-n="02"><h3><span class="n">II.</span> Discover</h3><p>Eleven routed sources with fallbacks. Pools swell to 2.5× asked; research waves loop until the count fills or sources run dry.</p></div>
-<div class="strike reveal" data-n="03"><h3><span class="n">III.</span> Research</h3><p>Robots-gated fetches, cached pages, embedded passages. Every PASS cites the exact lines that earned it.</p></div>
-<div class="strike reveal" data-n="04"><h3><span class="n">IV.</span> Qualify</h3><p>Code-graded PASS / FAIL / UNKNOWN. Conflicts and rot become UNCERTAIN — never averaged into false confidence.</p></div>
-<div class="strike reveal" data-n="05"><h3><span class="n">V.</span> Deliver</h3><p>Qualified plus capped uncertain ship with per-lead reasons. The disqualified are listed with their wounds, never counted.</p></div>
-<div class="strike reveal" data-n="06"><h3><span class="n">VI.</span> Refresh</h3><p>Reruns reuse fresh evidence and re-cut stale pages — REFRESHED, FRESH, STALE, or GONE, each explained.</p></div>
+<div class="rail" id="rail">
+<div class="strike" data-n="01"><h3><span class="n">I.</span> Compile</h3><p>Your sentence becomes a battle plan — geography, industry, size, signals, testable criteria. Business context sharpens buyer-fit.</p></div>
+<div class="strike" data-n="02"><h3><span class="n">II.</span> Discover</h3><p>Four search backends rotate so no index owns the pool. 2.5× candidates; research waves loop until the count fills.</p></div>
+<div class="strike" data-n="03"><h3><span class="n">III.</span> Research</h3><p>Robots-gated fetches, cached pages, embedded passages. Every PASS cites the exact lines that earned it.</p></div>
+<div class="strike" data-n="04"><h3><span class="n">IV.</span> Qualify</h3><p>Code-graded PASS / FAIL / UNKNOWN. Conflicts and rot become UNCERTAIN — never averaged into false confidence.</p></div>
+<div class="strike" data-n="05"><h3><span class="n">V.</span> Deliver</h3><p>Qualified plus capped uncertain ship with per-lead reasons. The disqualified are listed with their wounds, never counted.</p></div>
+<div class="strike" data-n="06"><h3><span class="n">VI.</span> Refresh</h3><p>Reruns reuse fresh evidence and re-cut stale pages — REFRESHED, FRESH, STALE, or GONE, each explained.</p></div>
 </div>
+<div class="rail-nav"><button class="btn small ghost" id="rail-l" type="button">←</button><button class="btn small ghost" id="rail-r" type="button">→</button></div>
+</section>
+
+<section class="block" id="verdicts">
+<h2 class="sec">Verdicts, explained</h2>
+<h2 class="big">Every state<br>has a reason.</h2>
+<div class="vtabs"><button class="vtab on" data-v="q" type="button">Qualified</button><button class="vtab" data-v="u" type="button">Uncertain</button><button class="vtab" data-v="d" type="button">Disqualified</button></div>
+<div class="vpane on" id="v-q"><div class="card"><b class="q">QUALIFIED</b> Moti Bakery <small>motibakery.com · conf 0.8</small><p>2/2 criteria pass — location matched, industry matched, both cited to retrieved passages.</p></div></div>
+<div class="vpane" id="v-u"><div class="card"><b class="u">UNCERTAIN</b> WorthTheWheat <small>worththewheat.com · conf 0.0</small><p>No hiring evidence, no size evidence — declared unknown instead of invented. Needs review.</p></div></div>
+<div class="vpane" id="v-d"><div class="card"><b class="d">DISQUALIFIED</b> Travel blog <small>indian-travel-places.com</small><p>Content about targets is not a target — page is an article. Listed with reasons, never counted.</p></div></div>
 </section>
 
 <section class="block" id="proof">
@@ -45,7 +64,7 @@
 <div class="stats">
 <div class="stat reveal"><b data-count="10">0</b><br><span>MCP tools</span></div>
 <div class="stat reveal"><b data-count="11">0</b><br><span>Routed sources</span></div>
-<div class="stat reveal"><b data-count="61">0</b><br><span>Checks green</span></div>
+<div class="stat reveal"><b data-count="72">0</b><br><span>Checks green</span></div>
 <div class="stat reveal"><b data-count="2">0</b><br><span>Output formats</span></div>
 </div>
 </section>
@@ -55,7 +74,7 @@
 <section class="block" id="arsenal">
 <h2 class="sec">The arsenal — MCP</h2>
 <h2 class="big">One blade.<br>Every hand.</h2>
-<p style="color:var(--muted);max-width:62ch">REAVER is an MCP server. Your AI host does the thinking; REAVER supplies ten lead-intelligence weapons — <b>prospect</b> runs the full hunt end-to-end, nine specialists handle discovery, research, enrichment, qualification, verification, dedup, refresh, and export. Same engine behind ChatGPT, Claude, Codex, OpenCode, and the Playground above.</p>
+<p style="color:var(--muted);max-width:62ch">REAVER is an MCP server. Your AI host does the thinking; REAVER supplies ten lead-intelligence weapons — <b>prospect</b> runs the full hunt end-to-end, nine specialists handle discovery, research, enrichment, qualification, verification, dedup, refresh, and export.</p>
 <div class="grid">
 <div class="strike reveal" data-n="⌁"><h3><span class="n">Local</span> Claude / OpenCode</h3><p>One line, localhost, no auth needed:<br><b>claude mcp add reaver -- python -m reaver_mcp.server --transport stdio</b></p></div>
 <div class="strike reveal" data-n="⇄"><h3><span class="n">Remote</span> ChatGPT / Claude API</h3><p>Expose over HTTPS with a bearer token, then paste the URL as an MCP server. Token enforced, localhost stays frictionless.</p></div>

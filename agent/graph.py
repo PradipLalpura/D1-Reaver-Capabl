@@ -138,21 +138,23 @@ def plan_node(state: S) -> dict:
 def discover_node(state: S) -> dict:
     seen: dict[str, dict] = {}
     fallbacks: list[dict] = []
-    backend = ""
+    backends_hit: list[str] = []
     desired = state.get("desired_count", 20)
     target = min(int(desired * 2.5), MAX_CANDIDATES)
-    used: list[str] = []
-    for backend_name in ["tavily", "serper", "serpapi", "exa"]:
-        if len(seen) >= target:
-            break
-        for query in state["queries"]:
-            res = router.route("web_search", query, n=10, skip=used)
+    order = ["tavily", "serper", "serpapi", "exa"]
+    for round_no in range(2):  # two passes max: volume first, diversity second
+        for index, query in enumerate(state["queries"]):
+            if len(seen) >= target:
+                break
+            # rotate the lead backend per query so one index never owns the pool;
+            # non-skipped backends stay available as fallbacks inside route()
+            skip = order[: (index + round_no * 2) % len(order)]
+            res = router.route("web_search", query, n=10, skip=skip)
             fallbacks.extend(res["fallbacks"])
             if not res["ok"]:
-                break  # backend dead → next backend, recorded in fallbacks
-            backend = backend or res["backend"]
-            if res["backend"] not in used:
-                used.append(res["backend"])
+                continue
+            if res["backend"] not in backends_hit:
+                backends_hit.append(res["backend"])
             for item in res["items"]:
                 url = item.get("url", "")
                 if not url or url in seen:
@@ -161,13 +163,15 @@ def discover_node(state: S) -> dict:
                              "url": url, "snippet": item.get("snippet", "")}
                 if len(seen) >= MAX_CANDIDATES:
                     break
-    # ponytail: pool target 2.5x asked; bigger pools costQuota linearly — measure before raising
-    out = {"pool": list(seen.values()), "wave": 0, "fallbacks": fallbacks, "backend": backend}
-    out = {"pool": list(seen.values()), "wave": 0, "fallbacks": fallbacks, "backend": backend}
+        if len(seen) >= target:
+            break
+    # ponytail: pool target 2.5x asked; bigger pools cost quota linearly — measure before raising
+    out = {"pool": list(seen.values()), "wave": 0, "fallbacks": fallbacks,
+           "backend": "+".join(backends_hit) or ""}
     if not out["pool"]:
         return {**_step(state, "discover:empty"), **out,
                 "error": "no candidates discovered"}
-    return {**_step(state, "discover:%d via %s" % (len(seen), backend or "?")), **out}
+    return {**_step(state, "discover:%d via %s" % (len(seen), out["backend"] or "?")), **out}
 
 
 JUNK_HOSTS = ("tripadvisor.", "instagram.", "reddit.", "facebook.", "youtube.", "youtu.be",

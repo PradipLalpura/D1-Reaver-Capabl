@@ -81,7 +81,8 @@ def route(fact: str, query: str, n: int = 5, cache_ttl: int = SEARCH_TTL, **kw) 
     started = time.time()
     fallbacks: list[dict] = []
     skipped = set(kw.get("skip", []))
-    key = cache.make_key("route", fact, query, n, kw.get("actor_kind", ""), kw.get("domain", ""))
+    key = cache.make_key("route", fact, query, n, kw.get("actor_kind", ""), kw.get("domain", ""),
+                           sorted(skipped))
     if fact in ("web_search", "entity", "local"):
         hit = cache.get(key)
         if hit is not None:
