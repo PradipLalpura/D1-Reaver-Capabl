@@ -30,10 +30,16 @@ SEARCH_TTL = 6 * 3600
 _spent: dict[str, int] = defaultdict(int)
 _last: dict[str, str] = {}
 _stats: dict[str, dict] = {}
+_calls: dict[str, int] = defaultdict(int)
 
 
 def spent(backend: str) -> int:
     return _spent[backend]
+
+
+def call_counts() -> dict[str, int]:
+    """Per-backend attempt counts this process. Powers quota reporting, not billing."""
+    return dict(_calls)
 
 
 def last_state() -> dict[str, str]:
@@ -63,6 +69,7 @@ def _call(backend: str, query: str, n: int, **kw):
         return {"status": "FAIL", "items": [], "note": "unknown backend"}
     if backend in METERED_BUDGET and out.status == "OK":
         _spent[backend] += 1
+    _calls[backend] += 1
     _last[backend] = out.status + ": " + out.note
     _stats[backend] = {"status": out.status, "ms": out.latency_ms, "note": out.note,
                        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
@@ -73,6 +80,7 @@ def route(fact: str, query: str, n: int = 5, cache_ttl: int = SEARCH_TTL, **kw) 
     """First healthy backend wins; every fallback recorded. OK results cached; failures never cached."""
     started = time.time()
     fallbacks: list[dict] = []
+    skipped = set(kw.get("skip", []))
     key = cache.make_key("route", fact, query, n, kw.get("actor_kind", ""), kw.get("domain", ""))
     if fact in ("web_search", "entity", "local"):
         hit = cache.get(key)
@@ -81,6 +89,8 @@ def route(fact: str, query: str, n: int = 5, cache_ttl: int = SEARCH_TTL, **kw) 
             hit["cached"] = True
             return hit
     for backend in ROUTES.get(fact, []):
+        if backend in skipped:
+            continue
         # ponytail: apify/hunter/jina take kwargs, not (query, n) — dispatched inside _call, not worth a plugin framework
         out = _call(backend, query, n, **kw)
         if out["status"] == "OK":

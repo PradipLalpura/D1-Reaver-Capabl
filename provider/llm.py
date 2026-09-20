@@ -25,7 +25,7 @@ KEY_NAMES_LLM = {
 
 DEFAULT_MODEL = {
     "groq": "openai/gpt-oss-20b",
-    "openrouter": "meta-llama/llama-3.1-8b-instruct",
+    "openrouter": "qwen/qwen3.8-27b:free",
     "gemini": "gemini-2.5-flash",
     "openai": "gpt-4o-mini",
     "anthropic": "claude-haiku-4-5",
@@ -43,12 +43,16 @@ def _chain(explicit: list[tuple[str, str, str]] | None = None) -> list[tuple[str
     if explicit:
         return [(p, m, k) for p, m, k in explicit if p in PROVIDERS and m and k]
     out = []
-    for prefix in ("REAVER_PRIMARY", "REAVER_FALLBACK"):
+    # ponytail: 3-deep default chain (groq → gemini → openrouter) because free tiers exhaust mid-run;
+    # 4th+ providers only via explicit session/env config
+    for prefix in ("REAVER_PRIMARY", "REAVER_FALLBACK", "REAVER_TERTIARY"):
         provider = os.environ.get(prefix + "_PROVIDER", "").strip().lower()
         if not provider and prefix == "REAVER_PRIMARY":
             provider = "groq"
         if not provider and prefix == "REAVER_FALLBACK":
             provider = "gemini"
+        if not provider and prefix == "REAVER_TERTIARY":
+            provider = "openrouter"
         if provider not in PROVIDERS:
             continue
         model = os.environ.get(prefix + "_MODEL", "").strip() or DEFAULT_MODEL[provider]
@@ -91,6 +95,12 @@ def chat_json(system: str, user: str, *, temperature: float = 0.0,
             if text.startswith("```"):
                 text = text.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(text)
+        except (ValueError, IndexError, AttributeError):
+            pass
+        try:  # salvage: parse the outermost {...} or [...] span, reject everything else
+            start = min([i for i in (text.find("{"), text.find("[")) if i >= 0])
+            end = max(text.rfind("}"), text.rfind("]"))
+            return json.loads(text[start:end + 1])
         except (ValueError, IndexError, AttributeError) as exc:
             failures.append("%s:%s bad json (%s)" % (provider, model, type(exc).__name__))
     raise LLMError("all providers failed: " + "; ".join(failures) if failures else "no provider keys configured")

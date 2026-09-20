@@ -167,6 +167,26 @@ def main() -> None:
     check("summaries carry conflicting values", summary["values"] == ["120", "400"])
     check("router stats recorded", isinstance(router.last_stats(), dict))
 
+    from agent.graph import need_topup, split_delivery
+    fake = lambda name, state: {"name": name, "domain": name + ".com", "state": state}
+    why = {"a.com": [{"criterion": "located in India", "state": "FAIL",
+                      "reason": "location mismatch"}]}
+    delivered, rejected = split_delivery(
+        [fake("q1", "QUALIFIED"), fake("q2", "QUALIFIED")] + [fake("u%d" % i, "UNCERTAIN") for i in range(10)]
+        + [fake("d1", "DISQUALIFIED")], {**{"q1.com": [], "q2.com": []},
+                                         **{"u%d.com" % i: [] for i in range(10)}, **why}, 20)
+    check("uncertain capped at 40pct", len(delivered) == 10 and len(rejected) == 3)
+    check("rejected carry reasons",
+          any(r["name"] == "d1" for r in rejected))
+    st = {"desired_count": 20, "wave": 0, "pool": [{}] * 40,
+          "verdicts": [{"state": "QUALIFIED"}]}
+    check("short pool tops up", need_topup(st) == "research")
+    st["wave"] = 2
+    check("waves capped", need_topup(st) == "dedupe")
+    st2 = {"desired_count": 20, "wave": 0, "pool": [],
+           "verdicts": [{"state": "QUALIFIED"}] * 12 + [{"state": "UNCERTAIN"}] * 20}
+    check("enough delivered stops", need_topup(st2) == "dedupe")
+
     from agent.graph import _coerce_spec
     from engine.models import BusinessContext
     plain = _coerce_spec({"geography": "Ahmedabad, India", "industry": "bakery", "criteria": []})

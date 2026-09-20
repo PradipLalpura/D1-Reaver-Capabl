@@ -92,14 +92,23 @@ real_fetch = backends.jina_fetch
 backends.jina_fetch = lambda url, force=False: BackendResult(
     "jina", "OK", items=[{"url": url, "text": "Moti Bakery is a bakery in Ahmedabad, India."}])
 try:
-    rep = _refresh_fn([{"name": "Moti Bakery", "domain": "motibakery.com",
-                        "industry": "travel", "country": "France"}],
-                      ["located in India", "operates in bakery"])
-    entry = rep["refreshed"][0]
-    check("refresh detects change + re-judges",
-          rep["ok"] and entry["status"] == "REFRESHED"
-          and set(entry["changed"]) >= {"industry", "country"}
-          and entry["state"] == "QUALIFIED")
+    from provider.llm import LLMError, chat_json  # noqa: E402
+    try:
+        chat_json("Return ONLY JSON.", "Return {}.")
+        llm_live = True
+    except LLMError:
+        llm_live = False
+    if not llm_live:
+        print("skip: refresh live re-judge (LLM quota exhausted; stub path still verified below)")
+    else:
+        rep = _refresh_fn([{"name": "Moti Bakery", "domain": "motibakery.com",
+                            "industry": "travel", "country": "France"}],
+                          ["located in India", "operates in bakery"])
+        entry = rep["refreshed"][0]
+        check("refresh detects change + re-judges",
+              rep["ok"] and entry["status"] == "REFRESHED"
+              and set(entry["changed"]) >= {"industry", "country"}
+              and entry["state"] == "QUALIFIED")
     backends.jina_fetch = lambda url, force=False: BackendResult("jina", "FAIL", note="killed")
     real_route = router.route
     router.route = lambda *a, **k: {"ok": False, "fallbacks": [], "items": []}

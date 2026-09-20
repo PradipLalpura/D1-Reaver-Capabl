@@ -22,9 +22,9 @@ from mesh import router
 from provider import llm
 
 MAX_QUERIES = 6
-MAX_CANDIDATES = 40
-RESEARCH_K = 10
+MAX_CANDIDATES = 60
 PAGE_TTL = 24 * 3600
+MAX_WAVES = 2  # waves 0..2, then honest shortfall — quota guard, raise only with measured need
 
 
 class S(TypedDict, total=False):
@@ -35,10 +35,13 @@ class S(TypedDict, total=False):
     business: dict
     spec: dict
     queries: list[str]
+    pool: list[dict]
+    wave: int
     candidates: list[dict]
     researched: list[dict]
     verdicts: list[dict]
     leads: list[dict]
+    rejected: list[dict]
     why: dict
     result: dict
     steps: list[str]
@@ -121,8 +124,9 @@ def plan_node(state: S) -> dict:
     queries = [q.strip() for q in queries if q.strip()][:MAX_QUERIES]
     industry, geo = spec.get("industry", ""), spec.get("geography", "")
     for fallback in ("%s in %s" % (industry, geo), "best %s %s" % (industry, geo),
-                     "%s %s directory" % (industry, geo), "top %s %s" % (industry, geo)):
-        if len(queries) >= 4:
+                     "%s %s directory" % (industry, geo), "top %s %s" % (industry, geo),
+                     "%s near %s" % (industry, geo), "%s %s reviews" % (industry, geo)):
+        if len(queries) >= 6:
             break
         if fallback.strip() and fallback not in queries:
             queries.append(fallback)
@@ -135,22 +139,32 @@ def discover_node(state: S) -> dict:
     seen: dict[str, dict] = {}
     fallbacks: list[dict] = []
     backend = ""
-    for query in state["queries"]:
-        res = router.route("web_search", query, n=10)
-        fallbacks.extend(res["fallbacks"])
-        if not res["ok"]:
-            continue
-        backend = backend or res["backend"]
-        for item in res["items"]:
-            url = item.get("url", "")
-            if not url or url in seen:
-                continue
-            seen[url] = {"name": item.get("title", ""), "domain": normalize_domain(url),
-                         "url": url, "snippet": item.get("snippet", "")}
-            if len(seen) >= MAX_CANDIDATES:
-                break
-    out = {"candidates": list(seen.values()), "fallbacks": fallbacks, "backend": backend}
-    if not out["candidates"]:
+    desired = state.get("desired_count", 20)
+    target = min(int(desired * 2.5), MAX_CANDIDATES)
+    used: list[str] = []
+    for backend_name in ["tavily", "serper", "serpapi", "exa"]:
+        if len(seen) >= target:
+            break
+        for query in state["queries"]:
+            res = router.route("web_search", query, n=10, skip=used)
+            fallbacks.extend(res["fallbacks"])
+            if not res["ok"]:
+                break  # backend dead → next backend, recorded in fallbacks
+            backend = backend or res["backend"]
+            if res["backend"] not in used:
+                used.append(res["backend"])
+            for item in res["items"]:
+                url = item.get("url", "")
+                if not url or url in seen:
+                    continue
+                seen[url] = {"name": item.get("title", ""), "domain": normalize_domain(url),
+                             "url": url, "snippet": item.get("snippet", "")}
+                if len(seen) >= MAX_CANDIDATES:
+                    break
+    # ponytail: pool target 2.5x asked; bigger pools costQuota linearly — measure before raising
+    out = {"pool": list(seen.values()), "wave": 0, "fallbacks": fallbacks, "backend": backend}
+    out = {"pool": list(seen.values()), "wave": 0, "fallbacks": fallbacks, "backend": backend}
+    if not out["pool"]:
         return {**_step(state, "discover:empty"), **out,
                 "error": "no candidates discovered"}
     return {**_step(state, "discover:%d via %s" % (len(seen), backend or "?")), **out}
@@ -159,20 +173,37 @@ def discover_node(state: S) -> dict:
 JUNK_HOSTS = ("tripadvisor.", "instagram.", "reddit.", "facebook.", "youtube.", "youtu.be",
                 "x.com", "twitter.", "tiktok.", "pinterest.")
 JUNK_PATHS = ("/search", "/questions", "/showtopic", "/media/", "/reel", "/shorts", "/hashtag")
+DIRECTORY_HOSTS = ("justdial.", "zomato.", "indiamart.", "tradeindia.", "sulekha.", "yelp.")
 
 
 def prefilter_node(state: S) -> dict:
+    chunk = min(max(state.get("desired_count", 10), 10), 15)
+    start = state.get("wave", 0) * chunk
+    done_urls = {c.get("url") for c in state.get("researched", [])}
+    seen_entities: set[str] = set()
     kept = []
-    for cand in state["candidates"]:
+    for cand in state.get("pool", [])[start:]:
         host, path = normalize_domain(cand["url"]), cand["url"].lower()
         if not cand["name"] or not cand["url"]:
             continue
         if any(h in host for h in JUNK_HOSTS) or any(p in path for p in JUNK_PATHS):
             continue  # threads/listicles/reels are content, not entities — universal rule, not industry logic
+        if cand["url"] in done_urls:
+            continue
+        # same merchant researched twice wastes a wave: official domains dedupe by host,
+        # directory hosts (many merchants, one host) dedupe by full path
+        entity = cand["url"] if any(h in host for h in DIRECTORY_HOSTS) else host or cand["name"]
+        if entity in seen_entities:
+            continue
+        seen_entities.add(entity)
         kept.append(cand)
-        if len(kept) >= min(max(state.get("desired_count", 10), 10), 15):
+        if len(kept) >= chunk:
             break
-    return {**_step(state, "prefilter:%d" % len(kept)), "candidates": kept}
+    if not kept:
+        return {**_step(state, "prefilter:empty"), "candidates": [],
+                "error": "candidate pool exhausted"}
+    return {**_step(state, "prefilter:%d (wave %d)" % (len(kept), state.get("wave", 0))),
+            "candidates": kept}
 
 
 def extract_fields(url: str, text: str, chain: list[tuple[str, str, str]] | None) -> dict:
@@ -228,10 +259,14 @@ def research_node(state: S) -> dict:
             owner = normalize_domain(cand["url"]) or cand["name"]
             cand["passages"] = rag.store_passages(owner, rag.chunk(text)[:8]) if text else []
     usable = [r for r in researched if r["attrs"]]
-    if not usable:
-        return {**_step(state, "research:empty"), "researched": researched,
+    prior = {(c.get("url"), c.get("name")) for c in state.get("researched", [])}
+    accumulated = [*state.get("researched", []),
+                   *[r for r in researched if (r.get("url"), r.get("name")) not in prior]]
+    if not usable and not [c for c in state.get("researched", []) if c.get("attrs")]:
+        return {**_step(state, "research:empty"), "researched": accumulated,
                 "error": "no researchable evidence"}
-    return {**_step(state, "research:%d/%d" % (len(usable), len(researched))), "researched": researched}
+    return {**_step(state, "research:%d new (%d total)" % (len(usable), len(accumulated))),
+            "researched": accumulated, "error": ""}
 
 
 def verify_node(state: S) -> dict:
@@ -272,11 +307,58 @@ def qualify_node(state: S) -> dict:
                          "evidence_count": sum(len(v) for v in cand["attrs"].values()),
                          "sources": [cand["url"]],
                          "criteria": [d.model_dump(mode="json") for d in details]})
-    return {**_step(state, "qualify:%d" % len(verdicts)), "verdicts": verdicts,
-            "why": {v["domain"] or v["name"]: v["criteria"] for v in verdicts}}
+    prior = {(v["domain"], v["name"]) for v in state.get("verdicts", [])}
+    fresh = [v for v in verdicts if (v["domain"], v["name"]) not in prior]
+    all_verdicts = [*state.get("verdicts", []), *fresh]
+    all_why = {**state.get("why", {}),
+               **{v["domain"] or v["name"]: v["criteria"] for v in fresh}}
+    return {**_step(state, "qualify:+%d (%d total)" % (len(fresh), len(all_verdicts))),
+            "verdicts": all_verdicts, "why": all_why}
+
+
+def topup_node(state: S) -> dict:
+    """Next wave: clear the empty-wave error, advance offset."""
+    return {**_step(state, "topup:wave %d" % (state.get("wave", 0) + 1)),
+            "wave": state.get("wave", 0) + 1, "error": ""}
+
+
+def need_topup(state: S) -> str:
+    """Delivered enough? Waves left? Pool left? The count-fulfillment decision."""
+    desired = state.get("desired_count", 20)
+    verdicts = state.get("verdicts", [])
+    cap = int(desired * 0.4)
+    delivered = sum(1 for v in verdicts if v["state"] == "QUALIFIED") \
+        + min(sum(1 for v in verdicts if v["state"] == "UNCERTAIN"), cap)
+    if delivered >= desired:
+        return "dedupe"
+    chunk = min(max(desired, 10), 15)
+    if state.get("wave", 0) >= MAX_WAVES:
+        return "dedupe"
+    if (state.get("wave", 0) + 1) * chunk >= len(state.get("pool", [])):
+        return "dedupe"
+    return "research"
+
+
+def split_delivery(merged: list[dict], why: dict, desired: int) -> tuple[list[dict], list[dict]]:
+    """Delivered = qualified + uncertain capped at 40% of asked. The rest go to rejected WITH reasons."""
+    cap = int(desired * 0.4)
+    qualified = [m for m in merged if m["state"] == "QUALIFIED"]
+    uncertain = [m for m in merged if m["state"] == "UNCERTAIN"]
+    disqualified = [m for m in merged if m["state"] == "DISQUALIFIED"]
+    delivered = qualified + uncertain[:cap]
+    rejected = []
+    for record in disqualified + uncertain[cap:]:
+        reasons = ["%s: %s" % (c["criterion"], c["reason"])
+                   for c in why.get(record["domain"] or record["name"], [])
+                   if c["state"] != "PASS"]
+        rejected.append({"name": record["name"], "domain": record["domain"],
+                         "state": record["state"], "reasons": reasons or ["no supporting evidence"]})
+    return delivered, rejected
 
 
 def dedupe_node(state: S) -> dict:
+    if not state.get("verdicts"):
+        return {**_step(state, "dedupe:empty"), "leads": [], "rejected": [], "why": {}}
     records = [LeadRecord(name=v["name"], domain=v["domain"], website=v["url"], city=v["city"],
                           country=v["country"], industry=v["industry"],
                           employee_count=v["employee_count"], state=LeadState(v["state"]),
@@ -291,8 +373,15 @@ def dedupe_node(state: S) -> dict:
             for item in why.get(key, []):
                 seen.setdefault(item["criterion"], item)
         merged_why[record.domain or record.name] = list(seen.values())
-    return {**_step(state, "dedupe:%d->%d" % (len(records), len(merged))),
-            "leads": [m.model_dump(mode="json") for m in merged], "why": merged_why}
+    merged_dicts = [m.model_dump(mode="json") for m in merged]
+    desired = state.get("desired_count", 20)
+    delivered, rejected = split_delivery(merged_dicts, merged_why, desired)
+    out: dict = {**_step(state, "dedupe:%d->%d, deliver %d, reject %d"
+                       % (len(records), len(merged), len(delivered), len(rejected))),
+                 "leads": delivered, "rejected": rejected, "why": merged_why}
+    if state.get("verdicts"):
+        out["error"] = ""  # waves produced verdicts; stale empty-wave errors don't fail the run
+    return out
 
 
 def export_node(state: S) -> dict:
@@ -302,9 +391,17 @@ def export_node(state: S) -> dict:
     conflicts = [{"lead": c["name"], "attribute": s["attribute"], "values": s.get("values", [])}
                  for c in state.get("researched", []) for s in c.get("verification", [])
                  if s.get("conflict")]
+    desired = state.get("desired_count", 20)
+    shortfall = max(desired - len(records), 0)
     return {**_step(state, "export:%s" % fmt),
             "result": {"ok": True, "format": fmt, "count": len(records), "data": data,
                        "why": state.get("why", {}), "conflicts": conflicts,
+                       "rejected": state.get("rejected", []), "shortfall": shortfall,
+                       "shortfall_note": ("source exhaustion after %d waves" % (MAX_WAVES + 1)
+                                          if shortfall else ""),
+                       "quota": {"calls": router.call_counts(),
+                                 "metered": {"apollo": router.spent("apollo"),
+                                             "apify": router.spent("apify")}},
                        "steps": state.get("steps", [])}}
 
 
@@ -317,19 +414,25 @@ def build():
     for name, fn in [("compile", compile_node), ("plan", plan_node), ("discover", discover_node),
                      ("prefilter", prefilter_node), ("research", research_node),
                      ("verify", verify_node), ("qualify", qualify_node),
-                     ("dedupe", dedupe_node), ("export", export_node)]:
+                     ("topup", topup_node), ("dedupe", dedupe_node), ("export", export_node)]:
         graph.add_node(name, fn)
     graph.set_entry_point("compile")
     graph.add_conditional_edges("compile", lambda s: END if s.get("error") else "plan")
     graph.add_edge("plan", "discover")
     graph.add_conditional_edges("discover", lambda s: END if s.get("error") else "prefilter")
-    graph.add_edge("prefilter", "research")
-    graph.add_conditional_edges("research", lambda s: END if s.get("error") else "verify")
+    graph.add_conditional_edges("prefilter", lambda s: END if s.get("error") else "research")
+    graph.add_conditional_edges("research", _after_research,
+                                {"verify": "verify", "research": "topup", "dedupe": "dedupe"})
     graph.add_edge("verify", "qualify")
-    graph.add_edge("qualify", "dedupe")
+    graph.add_conditional_edges("qualify", need_topup, {"research": "topup", "dedupe": "dedupe"})
+    graph.add_edge("topup", "research")
     graph.add_edge("dedupe", "export")
     graph.add_edge("export", END)
     return graph
+
+
+def _after_research(state: S) -> str:
+    return "verify" if not state.get("error") else need_topup(state)
 
 
 def _app():
