@@ -8,7 +8,24 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--abyss);color:var(--ink);font-family:var(--font);overflow-x:hidden}
+body{margin:0;background:var(--abyss);color:var(--ink);font-family:var(--font);overflow-x:hidden;
+  transition:background .5s,color .5s}
+
+/* ---------- bright theme: same brand, daylight forge ---------- */
+[data-theme="bright"]{--abyss:#F2F1F0;--deep:#E9E7E5;--navy:#ffffff;--line:#d8d4d0;
+  --ink:#1c2126;--muted:#5f6468;--card:#ffffff}
+[data-theme="bright"] body::before{background:radial-gradient(1000px 520px at 12% -6%,rgba(242,183,5,.16),transparent 60%),
+  radial-gradient(900px 600px at 95% 30%,rgba(21,188,223,.12),transparent 62%)}
+[data-theme="bright"] #stars,[data-theme="bright"] .hero .mark{opacity:.14}
+[data-theme="bright"] .strike,[data-theme="bright"] .card{background:#fff}
+[data-theme="bright"] .hero h1 .cut{-webkit-text-stroke:2px #1c2126}
+[data-theme="bright"] .about .panel{background:var(--navy)}
+[data-theme="bright"] .nav a.link{color:#3a3a3a}
+[data-theme="bright"] .marquee{background:rgba(255,255,255,.6)}
+.theme-btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:20px;
+  padding:6px 14px;font-size:12px;letter-spacing:.14em;cursor:pointer;transition:border-color .3s,color .3s}
+.theme-btn:hover{border-color:var(--gold);color:var(--gold-hot)}
+[data-theme="bright"] .theme-btn:hover{color:#9a6a00}
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   background:radial-gradient(1000px 520px at 12% -6%,rgba(242,183,5,.10),transparent 60%),
              radial-gradient(900px 600px at 95% 30%,rgba(22,35,61,.85),transparent 62%),

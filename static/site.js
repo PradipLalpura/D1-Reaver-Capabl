@@ -1,4 +1,13 @@
-// REAVER site chrome: forge loader, reveals, spark field, counters, magnetic CTAs. Vanilla only.
+// REAVER site chrome: theme, forge loader, reveals, spark field, counters, magnetic CTAs. Vanilla only.
+try {
+  if (localStorage.getItem("reaver-theme") === "bright") document.documentElement.dataset.theme = "bright";
+} catch (e) {}
+document.querySelectorAll("[data-theme-btn]").forEach(btn => btn.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "bright" ? "" : "bright";
+  if (next) document.documentElement.dataset.theme = next;
+  else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem("reaver-theme", next || "dark"); } catch (e) {}
+}));
 const WORDS = ["Heating", "Hammering", "Quenching", "Honing"];
 let wi = 0;
 const wordTimer = setInterval(() => {
