@@ -61,6 +61,7 @@ class LeadRecord(BaseModel):
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
     evidence_count: int = Field(default=0, ge=0)
     sources: list[str] = []
+    verdict_summary: str = Field(default="", max_length=1000)
 
 
 class TargetSpec(BaseModel):

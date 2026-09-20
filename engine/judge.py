@@ -177,3 +177,14 @@ def attach_citations(verdicts: list[CriterionVerdict], passages: list[dict]) -> 
                 verdict.reason = "unsupported by retrieved passages"
                 verdict.confidence = 0.0
     return verdicts
+
+
+def summarize_verdict(details: list[dict]) -> str:
+    """One-line human reason: pass ratio + up to 2 failing notes. Dumped verdict dicts in, sentence out."""
+    total = len(details)
+    passed = sum(1 for d in details if d.get("state") == "PASS")
+    notes = ["%s: %s" % (d.get("criterion", "?"), d.get("reason", "?"))
+             for d in details if d.get("state") != "PASS"][:2]
+    base = "%d/%d criteria pass" % (passed, total)
+    # ponytail: 2-note cap keeps CSV readable; full detail lives in the why-map
+    return base if not notes else base + "; " + "; ".join(notes)

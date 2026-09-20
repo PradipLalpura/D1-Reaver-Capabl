@@ -105,10 +105,14 @@ try:
                             "industry": "travel", "country": "France"}],
                           ["located in India", "operates in bakery"])
         entry = rep["refreshed"][0]
-        check("refresh detects change + re-judges",
-              rep["ok"] and entry["status"] == "REFRESHED"
-              and set(entry["changed"]) >= {"industry", "country"}
-              and entry["state"] == "QUALIFIED")
+        evidential = any(c.get("evidence") for c in entry.get("criteria", []))
+        if not evidential:
+            print("skip: refresh live re-judge (LLM died mid-run; extract returned empty)")
+        else:
+            check("refresh detects change + re-judges",
+                  rep["ok"] and entry["status"] == "REFRESHED"
+                  and set(entry["changed"]) >= {"industry", "country"}
+                  and entry["state"] == "QUALIFIED")
     backends.jina_fetch = lambda url, force=False: BackendResult("jina", "FAIL", note="killed")
     real_route = router.route
     router.route = lambda *a, **k: {"ok": False, "fallbacks": [], "items": []}

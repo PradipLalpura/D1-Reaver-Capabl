@@ -341,11 +341,14 @@ def need_topup(state: S) -> str:
 
 def split_delivery(merged: list[dict], why: dict, desired: int) -> tuple[list[dict], list[dict]]:
     """Delivered = qualified + uncertain capped at 40% of asked. The rest go to rejected WITH reasons."""
+    from engine.judge import summarize_verdict
     cap = int(desired * 0.4)
     qualified = [m for m in merged if m["state"] == "QUALIFIED"]
     uncertain = [m for m in merged if m["state"] == "UNCERTAIN"]
     disqualified = [m for m in merged if m["state"] == "DISQUALIFIED"]
     delivered = qualified + uncertain[:cap]
+    for record in delivered:
+        record["verdict_summary"] = summarize_verdict(why.get(record["domain"] or record["name"], []))
     rejected = []
     for record in disqualified + uncertain[cap:]:
         reasons = ["%s: %s" % (c["criterion"], c["reason"])

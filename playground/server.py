@@ -267,6 +267,10 @@ class Handler(BaseHTTPRequestHandler):
                                "count": result["count"], "steps": result.get("steps", []),
                                "why": result.get("why", {}), "rows": _preview(result),
                                "conflicts": result.get("conflicts", []),
+                               "rejected": result.get("rejected", []),
+                               "shortfall": result.get("shortfall", 0),
+                               "shortfall_note": result.get("shortfall_note", ""),
+                               "quota": result.get("quota", {}),
                                "download": token}
                 elif result is not None:
                     payload = {"node": "result", "ok": False, "error": result.get("error", "run failed"),

@@ -24,7 +24,7 @@ document.getElementById("save").onclick = async ()=>{
 };
 document.getElementById("clear").onclick = async ()=>{ await api("/api/session",{session_id:sid},"DELETE"); keystate.textContent = "cleared"; };
 document.getElementById("run").onclick = async ()=>{
-  steps.innerHTML = ""; leads.innerHTML = ""; conflicts.innerHTML = ""; dl.style.display = "none";
+  steps.innerHTML = ""; leads.innerHTML = ""; conflicts.innerHTML = ""; rejected.innerHTML = ""; shortfall.innerHTML = ""; quota.innerHTML = ""; dl.style.display = "none";
   const fmt = document.querySelector('input[name=fmt]:checked').value;
   const res = await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({session_id:sid,request:req.value,desired_count:+count.value,output_format:fmt,
@@ -41,11 +41,16 @@ document.getElementById("run").onclick = async ()=>{
 function finish(ev){
   (ev.steps||[]).forEach(s=>{ if(![...steps.children].some(li=>li.textContent===s)){ const li=document.createElement("li"); li.textContent=s; steps.appendChild(li); } });
   if(!ev.ok){ leads.innerHTML = "<p>failed: "+ev.error+"</p>"; return; }
+  if(ev.shortfall){ shortfall.innerHTML = "<p>⚠️ shortfall: "+ev.shortfall+" fewer than asked — "+esc(ev.shortfall_note)+"</p>"; }
+  (ev.rejected||[]).forEach(r=>{ const d=document.createElement("div"); d.className="card";
+    d.innerHTML = "<b class='d'>"+esc(r.state)+"</b> "+esc(r.name)+" <small>"+esc(r.domain)+"</small><p>"+esc((r.reasons||[]).join("; "))+"</p>"; rejected.appendChild(d); });
+  const calls = ev.quota&&ev.quota.calls ? Object.entries(ev.quota.calls).map(([k,v])=>k+" "+v).join(", ") : "";
+  if(calls) quota.textContent = "source calls: "+calls;
   (ev.conflicts||[]).forEach(c=>{ const d=document.createElement("div"); d.className="card";
     d.innerHTML = "⚠️ <b>"+esc(c.lead)+"</b> — conflicting <i>"+esc(c.attribute)+"</i>: "+c.values.map(esc).join(" vs "); conflicts.appendChild(d); });
   (ev.rows||[]).forEach(r=>{ const d=document.createElement("div"); d.className="card";
     const cls = r.lead_state==="QUALIFIED"?"q":r.lead_state==="DISQUALIFIED"?"d":"u";
-    d.innerHTML = "<b class='"+cls+"'>"+esc(r.lead_state)+"</b> "+esc(r.company)+" <small>"+esc(r.domain)+" · conf "+esc(r.confidence)+"</small>";
+    d.innerHTML = "<b class='"+cls+"'>"+esc(r.lead_state)+"</b> "+esc(r.company)+" <small>"+esc(r.domain)+" · conf "+esc(r.confidence)+"</small><p>"+esc(r.verdict_summary)+"</p>";
     const key = r.domain||r.company, why = (ev.why||{})[key]||[];
     if(why.length){ const det=document.createElement("details"); const sm=document.createElement("summary"); sm.textContent="Why qualified? ("+why.length+" criteria)"; det.appendChild(sm);
       why.forEach(c=>{ const p=document.createElement("p"); p.textContent=c.state+" — "+c.criterion+": "+c.reason; det.appendChild(p); }); d.appendChild(det); }

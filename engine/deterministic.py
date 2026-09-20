@@ -89,7 +89,8 @@ def summarize_attribute(
 
 HUBSPOT_HEADERS = ["company", "domain", "website", "city", "country", "industry",
                    "employee_count", "contact_name", "contact_email", "email_status",
-                   "lead_state", "confidence", "evidence_count", "sources"]
+                   "lead_state", "confidence", "evidence_count", "sources",
+                   "verdict_summary"]  # tail column: HubSpot leaves unmapped columns alone on import
 
 
 def _row(lead: LeadRecord) -> dict:
@@ -98,7 +99,8 @@ def _row(lead: LeadRecord) -> dict:
             "employee_count": lead.employee_count, "contact_name": lead.contact_name,
             "contact_email": lead.contact_email, "email_status": lead.email_status,
             "lead_state": lead.state.value, "confidence": lead.confidence,
-            "evidence_count": lead.evidence_count, "sources": "; ".join(lead.sources)}
+            "evidence_count": lead.evidence_count, "sources": "; ".join(lead.sources),
+            "verdict_summary": lead.verdict_summary}
 
 
 def to_csv(leads: list[LeadRecord]) -> str:

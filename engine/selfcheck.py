@@ -187,6 +187,16 @@ def main() -> None:
            "verdicts": [{"state": "QUALIFIED"}] * 12 + [{"state": "UNCERTAIN"}] * 20}
     check("enough delivered stops", need_topup(st2) == "dedupe")
 
+    from engine.judge import summarize_verdict
+    summary = summarize_verdict([{"criterion": "located in India", "state": "PASS", "reason": "matched"},
+                                 {"criterion": "has staff", "state": "UNKNOWN", "reason": "no evidence"}])
+    check("verdict summary reads", summary == "1/2 criteria pass; has staff: no evidence")
+    recs = [dict(LeadRecord(name="Acme", domain="acme.com").model_dump(), state="QUALIFIED")]
+    delivered, _ = split_delivery(recs, {"acme.com": [{"criterion": "c", "state": "PASS", "reason": "r"}]}, 20)
+    check("delivered carry summaries", delivered[0]["verdict_summary"] == "1/1 criteria pass")
+    csv_text = to_csv([LeadRecord.model_validate(delivered[0])])
+    check("csv carries verdict_summary", "verdict_summary" in csv_text.splitlines()[0])
+
     from agent.graph import _coerce_spec
     from engine.models import BusinessContext
     plain = _coerce_spec({"geography": "Ahmedabad, India", "industry": "bakery", "criteria": []})
