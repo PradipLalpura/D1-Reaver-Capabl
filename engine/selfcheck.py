@@ -181,7 +181,7 @@ def main() -> None:
     check("public bind demands token",
           requires_token("0.0.0.0") is True and requires_token("example.com") is True)
 
-    from agent.graph import need_topup, split_delivery
+    from agent.graph import enrich_node, need_topup, split_delivery
     fake = lambda name, state: {"name": name, "domain": name + ".com", "state": state}
     why = {"a.com": [{"criterion": "located in India", "state": "FAIL",
                       "reason": "location mismatch"}]}
@@ -200,6 +200,34 @@ def main() -> None:
     st2 = {"desired_count": 20, "wave": 0, "pool": [],
            "verdicts": [{"state": "QUALIFIED"}] * 12 + [{"state": "UNCERTAIN"}] * 20}
     check("enough delivered stops", need_topup(st2) == "dedupe")
+
+    from mesh import router as _router
+    real_route = _router.route
+    _router.route = lambda fact, query, n=1, **kw: {
+        "ok": True, "backend": "stub", "fallbacks": [], "cached": False,
+        "items": [{"name": "Acme", "domain": "acme.com", "industry": "software",
+                   "size": "50", "city": "Pune", "country": "India"}]
+        if fact == "firmographic" else
+        [{"email": "hi@acme.com", "confidence": 90, "type": "personal"}]
+        if fact == "email" else
+        [{"title": "Acme, Pune, India", "url": "", "snippet": ""}]
+        if fact == "local" else []}
+    try:
+        st = {"spec": {"industry": "software", "geography": "India"},
+              "researched": [{"name": "Acme", "domain": "acme.com",
+                              "url": "https://acme.com", "attrs": {}}]}
+        enrich_node(st)
+        got = st["researched"][0]["attrs"]
+        check("enrich fills every gap source",
+              set(got) >= {"industry", "employee_count", "city", "country", "contact_email"})
+        st2 = {"spec": {}, "researched": [{"name": "Acme", "domain": "acme.com",
+                                           "url": "https://acme.com",
+                                           "attrs": {"industry": [{"v": 1}]}}]}
+        enrich_node(st2)
+        after = st2["researched"][0]["attrs"]
+        check("page evidence never overwritten", after["industry"] == [{"v": 1}])
+    finally:
+        _router.route = real_route
 
     from engine.judge import summarize_verdict
     summary = summarize_verdict([{"criterion": "located in India", "state": "PASS", "reason": "matched"},

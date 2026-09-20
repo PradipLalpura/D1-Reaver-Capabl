@@ -1,4 +1,4 @@
-"""LangGraph orchestrator: compile → plan → discover → prefilter → research → verify → qualify → dedupe → export."""
+"""LangGraph: compile → plan → discover → prefilter → research → enrich → verify → qualify → dedupe → export."""
 from __future__ import annotations
 
 import os
@@ -12,6 +12,7 @@ from data import cache
 from engine.deterministic import (
     merge_leads,
     normalize_domain,
+    normalize_name,
     summarize_attribute,
     to_csv,
     to_json,
@@ -210,7 +211,7 @@ def prefilter_node(state: S) -> dict:
             "candidates": kept}
 
 
-def extract_fields(url: str, text: str, chain: list[tuple[str, str, str]] | None) -> dict:
+def extract_fields(url: str, text: str, chain: list[tuple] | None) -> dict:
     try:
         raw = llm.chat_json(
             "Extract JSON {industry, country, city, employee_count, hiring, signals[],"
@@ -253,6 +254,36 @@ def research_node(state: S) -> dict:
                                         confidence=0.8 if tier == 1 else 0.5).model_dump(mode="json")]
         researched.append({**cand, "attrs": attrs, "observed_at": now,
                            "page_type": str(fields.get("page_type", "unknown")).lower()})
+    # directory pages name real entities: mine ≤3 per wave for follow-ups (the list-to-lead bridge)
+    mined = 0
+    pool_urls = {c.get("url") for c in state.get("pool", [])}
+    pool_additions = []
+    for cand in researched:
+        if mined >= 3 or cand.get("page_type") != "directory":
+            continue
+        try:
+            raw = llm.chat_json(
+                "List the companies/entities this directory page describes."
+                " Return ONLY {entities: [{name, domain}]} with real domains from the text,"
+                " max 10. No guessing.",
+                (cache.get(cache.make_key("page", cand["url"])) or "")[:3000],
+                chain=chain)
+            entities = raw.get("entities", []) if isinstance(raw, dict) else []
+        except Exception:
+            continue
+        for ent in entities:
+            if not isinstance(ent, dict):
+                continue
+            domain = normalize_domain(str(ent.get("domain", "")))
+            if not domain or "." not in domain:
+                continue
+            url = "https://" + domain
+            if url in pool_urls:
+                continue
+            pool_urls.add(url)
+            pool_additions.append({"name": str(ent.get("name", domain))[:200], "domain": domain,
+                                   "url": url, "snippet": "mined from " + cand["url"]})
+        mined += 1
     from evidence import rag
     for cand in researched:
         if cand.get("fetch_note"):
@@ -266,11 +297,94 @@ def research_node(state: S) -> dict:
     prior = {(c.get("url"), c.get("name")) for c in state.get("researched", [])}
     accumulated = [*state.get("researched", []),
                    *[r for r in researched if (r.get("url"), r.get("name")) not in prior]]
+    pool = [*state.get("pool", []), *pool_additions[:MAX_CANDIDATES - len(state.get("pool", []))]]
     if not usable and not [c for c in state.get("researched", []) if c.get("attrs")]:
+        if pool_additions:
+            # directories yielded fresh entities: top up toward them instead of failing
+            return {**_step(state, "research:mined %d entities" % len(pool_additions)),
+                    "researched": accumulated, "pool": pool, "error": ""}
         return {**_step(state, "research:empty"), "researched": accumulated,
                 "error": "no researchable evidence"}
     return {**_step(state, "research:%d new (%d total)" % (len(usable), len(accumulated))),
-            "researched": accumulated, "error": ""}
+            "researched": accumulated, "pool": pool, "error": ""}
+
+
+TECH_HINTS = ("software", "saas", "tech", "artificial intelligence", "ai ", "cloud", "fintech")
+
+ENRICH_K = 8  # metered backends per wave cap; page evidence stays free and unlimited
+
+
+def _gap_evidence(attr: str, value: str, source: str, tier: int, confidence: float) -> dict:
+    return Evidence(attribute=attr, value=value[:500], source=source, tier=tier,
+                    observed_at=datetime.now(timezone.utc),
+                    confidence=confidence).model_dump(mode="json")
+
+
+def enrich_node(state: S) -> dict:
+    """Fill attribute gaps from every mesh backend. Page evidence always wins; enrichers only fill blanks.
+    Best-effort: backend failures become notes, never run failures."""
+    from evidence import rag
+    spec = state.get("spec", {})
+    industry_hint = str(spec.get("industry", "")).lower()
+    tech_target = any(h in industry_hint for h in TECH_HINTS)
+    fresh = [c for c in state.get("researched", []) if not c.get("_enriched") and not c.get("fetch_note")]
+    fresh.sort(key=lambda c: len(c.get("attrs", {})))
+    enriched = 0
+    for cand in fresh:
+        if enriched >= ENRICH_K:
+            break
+        if cand.get("page_type") in ("article", "directory"):
+            cand["_enriched"] = True
+            continue  # non-entities get mined, never enriched — metered quota only serves candidates
+        missing = {"industry", "country", "city", "employee_count", "hiring",
+                   "contact_email"} - set(cand["attrs"])
+        if not missing:
+            cand["_enriched"] = True
+            continue
+        notes = []
+        if cand.get("domain") or cand.get("name"):
+            firm = router.route("firmographic", cand["name"] or cand["domain"], n=1)
+            orgs = firm["items"] if firm["ok"] else []
+            if orgs:
+                org = orgs[0]
+                fill = {"industry": org.get("industry", ""),
+                        "employee_count": str(org.get("size", "")),
+                        "city": org.get("city", ""), "country": org.get("country", "")}
+                for attr, value in fill.items():
+                    if attr in missing and str(value).strip():
+                        cand["attrs"][attr] = [_gap_evidence(attr, str(value), "apollo", 3, 0.6)]
+                        missing.discard(attr)
+            else:
+                notes.append("apollo: " + (firm["fallbacks"][0]["note"] if firm["fallbacks"] else "no match"))
+        if cand.get("domain") and "contact_email" in missing:
+            found = router.route("email", cand["domain"], n=3, domain=cand["domain"])
+            if found["ok"] and found["items"]:
+                cand["attrs"]["contact_email"] = [_gap_evidence(
+                    "contact_email", found["items"][0].get("email", ""), "hunter", 3, 0.6)]
+                missing.discard("contact_email")
+        if not (set(cand["attrs"]) & {"country", "city"}) and spec.get("geography"):
+            local = router.route("local", "%s %s" % (cand["name"], spec["geography"]), n=1)
+            if local["ok"] and local["items"]:
+                country = (local["items"][0].get("title", "").split(",") or [""])[-1].strip()
+                if country:
+                    cand["attrs"].setdefault("country", [_gap_evidence("country", country, "osm", 3, 0.4)])
+        if tech_target and "industry" in missing:
+            tech = router.route("tech", cand["name"], n=3)
+            if tech["ok"]:
+                token = normalize_name(cand["name"]).split(" ")[0] if cand["name"] else ""
+                for repo in tech["items"]:
+                    if token and token in str(repo.get("title", "")).lower():
+                        cand["attrs"]["industry"] = [_gap_evidence(
+                            "industry", "software: " + repo.get("title", ""), "github", 2, 0.5)]
+                        break
+        cand["_enriched"] = True
+        if notes:
+            cand["enrich_note"] = "; ".join(notes)
+        enriched += 1
+    # ponytail: passages stay page-bound; enricher values join qualification via attrs, not vector store
+    for cand in state.get("researched", []):
+        cand.pop("fetch_note", None)
+    return {**_step(state, "enrich:%d" % enriched)}
 
 
 def verify_node(state: S) -> dict:
@@ -294,14 +408,13 @@ def qualify_node(state: S) -> dict:
         details = attach_citations(details, cand.get("passages", []))
         status, confidence = restate(criteria, details)
         page_type = cand.get("page_type", "unknown")
-        if page_type == "article":
+        if page_type in ("article", "directory"):
             from engine.models import CriterionState, CriterionVerdict
             details = [*details, CriterionVerdict(criterion="is a target entity, not content",
-                                                  state=CriterionState.FAIL, reason="page is an article",
+                                                  state=CriterionState.FAIL,
+                                                  reason="page is %s, not an entity" % page_type,
                                                   confidence=0.9, evidence=[])]
-            status = "DISQUALIFIED"  # content about targets is not a target
-        elif page_type == "directory" and status == "QUALIFIED":
-            status = "UNCERTAIN"  # a listing page can't prove any single merchant
+            status = "DISQUALIFIED"  # content/lists about targets are not targets (mined separately)
         verdicts.append({"name": cand["name"], "domain": cand["domain"], "url": cand["url"],
                          "country": next((e["value"] for e in cand["attrs"].get("country", [])), ""),
                          "city": next((e["value"] for e in cand["attrs"].get("city", [])), ""),
@@ -420,7 +533,7 @@ def build():
     graph = StateGraph(S)
     for name, fn in [("compile", compile_node), ("plan", plan_node), ("discover", discover_node),
                      ("prefilter", prefilter_node), ("research", research_node),
-                     ("verify", verify_node), ("qualify", qualify_node),
+                     ("enrich", enrich_node), ("verify", verify_node), ("qualify", qualify_node),
                      ("topup", topup_node), ("dedupe", dedupe_node), ("export", export_node)]:
         graph.add_node(name, fn)
     graph.set_entry_point("compile")
@@ -429,7 +542,8 @@ def build():
     graph.add_conditional_edges("discover", lambda s: END if s.get("error") else "prefilter")
     graph.add_conditional_edges("prefilter", lambda s: END if s.get("error") else "research")
     graph.add_conditional_edges("research", _after_research,
-                                {"verify": "verify", "research": "topup", "dedupe": "dedupe"})
+                                {"verify": "enrich", "research": "topup", "dedupe": "dedupe"})
+    graph.add_edge("enrich", "verify")
     graph.add_edge("verify", "qualify")
     graph.add_conditional_edges("qualify", need_topup, {"research": "topup", "dedupe": "dedupe"})
     graph.add_edge("topup", "research")
