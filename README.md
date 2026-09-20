@@ -21,6 +21,33 @@ python -m reaver_mcp.server --transport stdio          # Claude / OpenCode / loc
 python -m reaver_mcp.server --transport http --port 8000
 ```
 
+### Connect Claude Code / Claude Desktop (local, today)
+
+```bash
+claude mcp add reaver -- python -m reaver_mcp.server --transport stdio
+```
+
+Claude Desktop: same command + args in `Settings → Connectors → Add MCP server`.
+Then ask: *"find 20 bakeries in Ahmedabad"* — Claude discovers `prospect` and calls it.
+
+### Connect ChatGPT / Claude API (remote — needs public HTTPS)
+
+Both verified paths (OpenAI Apps SDK plugin model; Anthropic `mcp_servers` URL
+connector, beta `mcp-client-2025-11-20`) require the MCP on a public HTTPS URL —
+localhost is rejected by both. Steps:
+
+```bash
+# 1. expose with a token (refuses non-loopback binds without one)
+python -m reaver_mcp.server --transport http --host 0.0.0.0 --port 8000 --token $REAVER_MCP_TOKEN
+# 2. terminate TLS in front (Caddy/nginx/Cloudflare Tunnel) → https://your-host/mcp/
+```
+
+- ChatGPT: developer mode → Connectors → add `https://your-host/mcp/` (Apps SDK plugin packaging for directory listing).
+- Claude API: `"mcp_servers": [{"type": "url", "url": "https://your-host/mcp/",
+  "name": "reaver", "authorization_token": "<same token>"}]` + `mcp_toolset`.
+- Zero-deploy interim for your own testing: point a localhost tunnel (ngrok/cloudflared)
+  at port 8000 and paste the tunnel URL instead. Same token, same auth.
+
 Tools: `prospect` (end-to-end) + `discover_leads, research_target, enrich_lead,
 qualify_lead, verify_evidence, deduplicate_leads, refresh_leads, export_leads` + `doctor`.
 `output_format` is `csv` (default) or `json` — nothing else.

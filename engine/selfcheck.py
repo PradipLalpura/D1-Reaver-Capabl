@@ -167,6 +167,11 @@ def main() -> None:
     check("summaries carry conflicting values", summary["values"] == ["120", "400"])
     check("router stats recorded", isinstance(router.last_stats(), dict))
 
+    from reaver_mcp.server import requires_token
+    check("loopback needs no token", requires_token("127.0.0.1") is False)
+    check("public bind demands token",
+          requires_token("0.0.0.0") is True and requires_token("example.com") is True)
+
     from agent.graph import need_topup, split_delivery
     fake = lambda name, state: {"name": name, "domain": name + ".com", "state": state}
     why = {"a.com": [{"criterion": "located in India", "state": "FAIL",

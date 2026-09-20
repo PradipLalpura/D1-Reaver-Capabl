@@ -278,13 +278,38 @@ def doctor() -> dict:
             "method": "key presence + last-call memory (no quota burned)", "sources": sources}
 
 
+def requires_token(host: str) -> bool:
+    """Any non-loopback bind must carry a bearer token. Localhost stays frictionless."""
+    return host not in ("127.0.0.1", "localhost", "::1")
+
+
 def main() -> None:
+    import os
     parser = argparse.ArgumentParser(prog="reaver-mcp")
     parser.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--token", default=os.environ.get("REAVER_MCP_TOKEN", ""))
     args = parser.parse_args()
     if args.transport == "http":
-        mcp.run(transport="streamable-http", host="127.0.0.1", port=args.port)
+        if requires_token(args.host) and not args.token:
+            parser.error("non-loopback bind requires --token (or REAVER_MCP_TOKEN)")
+        import uvicorn
+        app = mcp.streamable_http_app()
+        if args.token:
+            from starlette.middleware.base import BaseHTTPMiddleware
+            from starlette.responses import JSONResponse
+
+            token = args.token
+
+            class BearerAuth(BaseHTTPMiddleware):
+                async def dispatch(self, request, call_next):
+                    if request.headers.get("authorization") != "Bearer " + token:
+                        return JSONResponse({"error": "unauthorized"}, 401)
+                    return await call_next(request)
+
+            app.add_middleware(BearerAuth)
+        uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     else:
         mcp.run(transport="stdio")
 
