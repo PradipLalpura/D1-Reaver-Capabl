@@ -105,6 +105,20 @@ def main() -> None:
     finally:
         _backends.hunter_domain, _backends.jina_fetch = real_hunter, real_jina
 
+    from engine.judge import judge_criterion, judge_lead
+    attrs = {"country": [ev("country", "India")], "industry": [ev("industry", "bakery")]}
+    check("location pass", judge_criterion("located in India", attrs).state.value == "PASS")
+    check("location fail", judge_criterion("located in France", attrs).state.value == "FAIL")
+    check("industry pass", judge_criterion("operates in bakery", attrs).state.value == "PASS")
+    check("absence is unknown",
+          judge_criterion("has 50 employees", attrs).state.value == "UNKNOWN")
+    check("no evidence is unknown",
+          judge_criterion("located in India", {}).state.value == "UNKNOWN")
+    state, _, _ = judge_lead(["located in India", "operates in bakery"], attrs)
+    check("lead qualifies on evidence", state == "QUALIFIED")
+    state, _, _ = judge_lead(["located in France", "operates in bakery"], attrs)
+    check("hard mismatch disqualifies", state == "DISQUALIFIED")
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

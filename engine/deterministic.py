@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from .models import Evidence, LeadRecord
+from .models import CriterionState, CriterionVerdict, Evidence, LeadRecord, LeadState
 
 LEGAL_SUFFIX = {"inc", "llc", "ltd", "corp", "co", "gmbh", "sarl", "pte", "pl", "llp", "pvt"}
 

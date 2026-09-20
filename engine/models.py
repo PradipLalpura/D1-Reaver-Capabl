@@ -66,3 +66,14 @@ class TargetSpec(BaseModel):
     request: str = Field(min_length=3, max_length=4000)
     desired_count: Annotated[int, Field(ge=1, le=MAX_LEADS)] = 20
     output_format: OutputFormat = OutputFormat.csv
+
+
+class CompiledTarget(BaseModel):
+    """LLM-extracted spec, schema-validated. Empty strings = unknown, never guessed."""
+    geography: str = ""
+    industry: str = ""
+    size_min: int | None = None
+    size_max: int | None = None
+    signals: list[str] = []
+    exclusions: list[str] = []
+    criteria: list[str] = Field(min_length=1, max_length=20)

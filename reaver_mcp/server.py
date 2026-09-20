@@ -45,8 +45,18 @@ def _leads(raw: object, tool: str) -> tuple[list[LeadRecord] | None, dict | None
 
 @mcp.tool()
 def prospect(request: str, desired_count: int = 20, output_format: str = "csv") -> dict:
-    """End-to-end NL request → qualified leads. Lands in Phase 3."""
-    return _not_built("prospect", 3, "LangGraph orchestrator")
+    """End-to-end NL request → qualified leads. WIRED (Phase 3, LangGraph)."""
+    try:
+        spec = TargetSpec(request=request, desired_count=desired_count)
+    except ValidationError:
+        return _err("prospect", "request 3-4000 chars, desired_count 1-%d" % MAX_LEADS)
+    if output_format not in ("csv", "json"):
+        return _err("prospect", "output_format must be csv or json")
+    from agent.graph import run_prospect
+    try:
+        return run_prospect(spec.request, spec.desired_count, output_format)
+    except Exception:
+        return _err("prospect", "run failed; retry or narrow the request")
 
 
 @mcp.tool()
@@ -125,9 +135,24 @@ def enrich_lead(name: str, domain: str = "") -> dict:
 
 
 @mcp.tool()
-def qualify_lead(name: str, criteria: list[str] = []) -> dict:
-    """Criterion-by-criterion qualification. Lands in Phase 3."""
-    return _not_built("qualify_lead", 3, "qualifier")
+def qualify_lead(name: str, criteria: list[str] = [], evidence: list[dict] = []) -> dict:
+    """Criterion-by-criterion qualification over supplied evidence. WIRED (Phase 3)."""
+    if not name.strip() or len(name) > 300:
+        return _err("qualify_lead", "name 1-300 chars required")
+    if not criteria or len(criteria) > 20:
+        return _err("qualify_lead", "provide 1-20 criteria")
+    try:
+        items = [Evidence.model_validate(e) for e in evidence]
+    except ValidationError:
+        return _err("qualify_lead", "evidence failed validation")
+    from engine.judge import judge_lead
+    grouped: dict[str, list[Evidence]] = defaultdict(list)
+    for item in items:
+        grouped[item.attribute].append(item)
+    status, confidence, details = judge_lead(criteria, grouped)
+    return {"ok": True, "tool": "qualify_lead", "name": name, "state": status,
+            "confidence": confidence,
+            "criteria": [d.model_dump(mode="json") for d in details]}
 
 
 @mcp.tool()

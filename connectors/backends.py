@@ -186,14 +186,25 @@ def apify_run(actor_kind: str, run_input: dict) -> BackendResult:
 
 def jina_fetch(url: str) -> BackendResult:
     """Page text via Jina Reader. Robots gate is unconditional — no bypass parameter exists."""
+    from data import cache as _cache
+    key = _cache.make_key("page", url)
+    hit = _cache.get(key)
+    if isinstance(hit, str) and hit:
+        return BackendResult("jina", "OK", items=[{"url": url, "text": hit}],
+                             note="cache hit")
     ok, reason = robots.allowed(url)
     if not ok:
         return BackendResult("jina", "FAIL", note="skipped: " + reason)
     res = http.call("https://r.jina.ai/" + url)
+    if res["http"] == 429:
+        import time as _time
+        _time.sleep(5)  # ponytail: one polite retry; full backoff ladder belongs in Phase 7 refresh
+        res = http.call("https://r.jina.ai/" + url)
     if res["http"] != 200:
         return BackendResult("jina", "FAIL", latency_ms=res.get("ms", 0),
                              note="reader http %s" % res["http"])
     text = res["body"].decode("utf-8", "replace")
+    _cache.put(key, text[:8000], 24 * 3600)
     return BackendResult("jina", "OK", items=[{"url": url, "text": text[:4000]}],
                          latency_ms=res.get("ms", 0),
                          note="truncated=%s" % res.get("truncated", False))
