@@ -141,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._page("landing.html")
         if path == "/playground":
             return self._page("playground.html")
+        if path == "/mcp-docs":
+            return self._page("mcp.html")
         if path == "/favicon.ico":
             return self._brand("Favicon.png", "image/png")
         if path == "/img/logo":
@@ -195,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, name: str) -> None:
         import os
-        if name not in ("app.js", "site.js", "style.css"):
+        if name not in ("app.js", "site.js", "mcp.js", "style.css"):
             if "text/html" in (self.headers.get("Accept") or ""):
                 return self._not_found_page()
             return self._json(404, {"ok": False, "error": "unknown path"})

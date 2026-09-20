@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/", "destination": "/static/landing.html" },
     { "source": "/playground", "destination": "https://REAVER_PLAYGROUND_HOST/playground" },
+    { "source": "/mcp-docs", "destination": "/static/mcp.html" },
     { "source": "/api/:path*", "destination": "https://REAVER_PLAYGROUND_HOST/api/:path*" },
     { "source": "/mcp/:path*", "destination": "https://REAVER_MCP_HOST/mcp/:path*" }
   ]
