@@ -43,6 +43,7 @@ class CriterionVerdict(BaseModel):
     reason: str
     confidence: Annotated[float, Field(ge=0.0, le=1.0)]
     evidence: list[Evidence] = []
+    citations: list[str] = []  # passage ids backing this verdict; empty = unsupported
 
 
 class LeadRecord(BaseModel):

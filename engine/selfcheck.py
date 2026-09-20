@@ -140,6 +140,29 @@ def main() -> None:
                         "data": 'company,domain\n"Acme, Inc",acme.com\n'})
     check("preview parses quoted csv", preview and preview[0]["company"] == "Acme, Inc")
 
+    from evidence import rag
+    long_text = " ".join("Sentence %d about bakeries in Ahmedabad with fresh bread." % i for i in range(30))
+    chunks = rag.chunk(long_text)
+    check("chunker splits", len(chunks) >= 2 and all(len(c) <= 500 for c in chunks))
+    check("cosine identity", abs(rag.cosine([1.0, 0.0], [1.0, 0.0]) - 1.0) < 1e-9)
+    pool = [{"id": "a#0", "text": "unrelated weather report", "vector": None},
+            {"id": "a#1", "text": "bakery in Ahmedabad baking fresh bread", "vector": None}]
+    hits = rag.retrieve("operates in bakery Ahmedabad", pool)
+    check("retrieve ranks keyword passage", hits and hits[0]["id"] == "a#1")
+    check("empty pool retrieves nothing", rag.retrieve("operates in bakery", []) == [])
+
+    from engine.judge import attach_citations
+    from engine.models import CriterionVerdict
+    passing = [CriterionVerdict(criterion="operates in bakery", state="PASS",
+                                reason="keyword evidenced", confidence=0.7, evidence=[])]
+    stripped = attach_citations(passing, [])
+    check("ablation: no passages flips PASS to UNKNOWN",
+          stripped[0].state.value == "UNKNOWN" and not stripped[0].citations)
+    kept = attach_citations([CriterionVerdict(criterion="operates in bakery", state="PASS",
+                                              reason="keyword evidenced", confidence=0.7, evidence=[])], pool)
+    check("ablation: cited PASS survives",
+          kept[0].state.value == "PASS" and kept[0].citations == ["a#1"])
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

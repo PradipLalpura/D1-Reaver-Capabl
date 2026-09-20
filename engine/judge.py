@@ -143,6 +143,11 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
 def judge_lead(criteria: list[str], attrs: dict[str, list[Evidence]]) -> tuple[str, float, list[CriterionVerdict]]:
     """Lead state: hard-kind FAIL → DISQUALIFIED; soft FAIL → UNCERTAIN; no PASS → UNCERTAIN."""
     verdicts = [judge_criterion(c, attrs) for c in criteria]
+    return (*restate(criteria, verdicts), verdicts)
+
+
+def restate(criteria: list[str], verdicts: list[CriterionVerdict]) -> tuple[str, float]:
+    """Recompute lead state/confidence from final verdicts (after citation or page-type adjustments)."""
     kinds = [_kind(c) for c in criteria]
     states = [v.state for v in verdicts]
     score = round(sum(1.0 if s == CriterionState.PASS else 0.5 if s == CriterionState.UNKNOWN else 0.0
@@ -155,4 +160,18 @@ def judge_lead(criteria: list[str], attrs: dict[str, list[Evidence]]) -> tuple[s
     elif CriterionState.PASS in states and CriterionState.FAIL not in states:
         state = "QUALIFIED"
     confidence = round(sum(v.confidence for v in verdicts) / max(len(verdicts), 1), 2)
-    return state, confidence if state == "QUALIFIED" else round(min(confidence, score), 2), verdicts
+    return state, confidence if state == "QUALIFIED" else round(min(confidence, score), 2)
+
+
+def attach_citations(verdicts: list[CriterionVerdict], passages: list[dict]) -> list[CriterionVerdict]:
+    """PASS backed by no retrievable passage is a guess: cite or downgrade. The RAG load-bearing rule."""
+    from evidence import rag
+    for verdict in verdicts:
+        if verdict.state == CriterionState.PASS:
+            hits = rag.retrieve(verdict.criterion, passages)
+            verdict.citations = [h["id"] for h in hits]
+            if not hits:
+                verdict.state = CriterionState.UNKNOWN
+                verdict.reason = "unsupported by retrieved passages"
+                verdict.confidence = 0.0
+    return verdicts

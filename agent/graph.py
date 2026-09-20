@@ -202,6 +202,15 @@ def research_node(state: S) -> dict:
                                         confidence=0.8 if tier == 1 else 0.5).model_dump(mode="json")]
         researched.append({**cand, "attrs": attrs, "observed_at": now,
                            "page_type": str(fields.get("page_type", "unknown")).lower()})
+    from evidence import rag
+    for cand in researched:
+        if cand.get("fetch_note"):
+            cand["passages"] = []
+        else:
+            cached_text = cache.get(cache.make_key("page", cand["url"]))
+            text = cached_text if isinstance(cached_text, str) else ""
+            owner = normalize_domain(cand["url"]) or cand["name"]
+            cand["passages"] = rag.store_passages(owner, rag.chunk(text)[:8]) if text else []
     usable = [r for r in researched if r["attrs"]]
     if not usable:
         return {**_step(state, "research:empty"), "researched": researched,
@@ -221,18 +230,21 @@ def verify_node(state: S) -> dict:
 
 
 def qualify_node(state: S) -> dict:
+    from engine.judge import attach_citations, restate
     criteria = state["spec"]["criteria"]
     verdicts = []
     for cand in state["researched"]:
         attrs = {attr: [Evidence.model_validate(e) for e in evs] for attr, evs in cand["attrs"].items()}
         status, confidence, details = judge_lead(criteria, attrs)
+        details = attach_citations(details, cand.get("passages", []))
+        status, confidence = restate(criteria, details)
         page_type = cand.get("page_type", "unknown")
         if page_type == "article":
             from engine.models import CriterionState, CriterionVerdict
-            status, confidence = "DISQUALIFIED", confidence  # content about targets is not a target
             details = [*details, CriterionVerdict(criterion="is a target entity, not content",
                                                   state=CriterionState.FAIL, reason="page is an article",
                                                   confidence=0.9, evidence=[])]
+            status = "DISQUALIFIED"  # content about targets is not a target
         elif page_type == "directory" and status == "QUALIFIED":
             status = "UNCERTAIN"  # a listing page can't prove any single merchant
         verdicts.append({"name": cand["name"], "domain": cand["domain"], "url": cand["url"],
