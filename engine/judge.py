@@ -1,7 +1,7 @@
 """Criterion rules. Code decides PASS/FAIL/UNKNOWN; the LLM never grades. Absence → UNKNOWN, never FAIL."""
 from __future__ import annotations
 
-from engine.deterministic import _numeric, normalize_name
+from engine.deterministic import _conflicts, _numeric, normalize_name
 from engine.models import CriterionState, CriterionVerdict, Evidence
 
 STOPWORDS = {"the", "and", "with", "that", "have", "has", "are", "for", "from", "this", "which",
@@ -29,6 +29,12 @@ def _values(attrs: dict[str, list[Evidence]], *names: str) -> list[Evidence]:
     return [e for name in names for e in attrs.get(name, [])]
 
 
+def _conflict_reason(used: list[Evidence]) -> str:
+    """Any attribute judged from disagreeing sources is UNKNOWN — averaging lies."""
+    bad, distinct = _conflicts([e.value for e in used])
+    return ("conflicting evidence: " + " vs ".join(distinct[:3])) if bad else ""
+
+
 def _confidence(used: list[Evidence]) -> float:
     if not used:
         return 0.0
@@ -49,6 +55,10 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
         if not used:
             return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
                                     reason="no location evidence", confidence=0.0)
+        blocked = _conflict_reason(used)
+        if blocked:
+            return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
+                                    reason=blocked, confidence=0.0, evidence=used)
         haystack = " ".join(e.value.lower() for e in used)
         wants = [w for w in normalize_name(criterion).split() if len(w) > 2 and w not in STOPWORDS]
         if any(w in haystack for w in wants):
@@ -62,6 +72,10 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
         if not used:
             return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
                                     reason="no industry evidence", confidence=0.0)
+        blocked = _conflict_reason(used)
+        if blocked:
+            return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
+                                    reason=blocked, confidence=0.0, evidence=used)
         haystack = " ".join(e.value.lower() for e in used)
         wants = [w for w in normalize_name(criterion).split() if len(w) > 2 and w not in STOPWORDS]
         if any(w in haystack for w in wants):
@@ -72,6 +86,10 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
 
     if kind == "size":
         used = _values(attrs, "employee_count")
+        blocked = _conflict_reason(used)
+        if blocked:
+            return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
+                                    reason=blocked, confidence=0.0, evidence=used)
         numbers = [n for n in (_numeric(e.value) for e in used) if n is not None]
         bounds = [_numeric(t) for t in criterion.replace(",", "").split()]
         bounds = [b for b in bounds if b is not None]
@@ -91,6 +109,10 @@ def judge_criterion(criterion: str, attrs: dict[str, list[Evidence]]) -> Criteri
         if not used:
             return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
                                     reason="no hiring evidence", confidence=0.0)
+        blocked = _conflict_reason(used)
+        if blocked:
+            return CriterionVerdict(criterion=criterion, state=CriterionState.UNKNOWN,
+                                    reason=blocked, confidence=0.0, evidence=used)
         haystack = " ".join(e.value.lower() for e in used)
         if any(w in haystack for w in ("active", "open", "hiring", "yes")):
             state, reason = CriterionState.PASS, "hiring signal active"
