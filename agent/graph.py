@@ -32,6 +32,7 @@ class S(TypedDict, total=False):
     desired_count: int
     output_format: str
     llm_chain: list
+    business: dict
     spec: dict
     queries: list[str]
     candidates: list[dict]
@@ -54,7 +55,7 @@ def _chain_of(state: S) -> list[tuple[str, str, str]] | None:
     return out or None  # None → provider defaults (env → free-tier chain)
 
 
-def _coerce_spec(raw: object) -> dict | None:
+def _coerce_spec(raw: object, business: dict | None = None) -> dict | None:
     """Tolerant mapping: known keys coerced, unknowns dropped, gaps filled from geography/industry."""
     if not isinstance(raw, dict):
         return None
@@ -71,6 +72,14 @@ def _coerce_spec(raw: object) -> dict | None:
             spec["criteria"].append("located in " + spec["geography"])
         if spec["industry"]:
             spec["criteria"].append("operates in " + spec["industry"])
+    business = business or {}
+    buyer = str(business.get("ideal_buyer", "")).strip()[:200]
+    if buyer and not any("serves" in c.lower() for c in spec["criteria"]):
+        spec["criteria"].append("serves " + buyer)  # buyer-fit: seller context sharpens, never invents
+    for breaker in business.get("dealbreakers", [])[:5]:
+        if isinstance(breaker, str) and breaker.strip():
+            spec["criteria"].append("must not be " + breaker.strip()[:200])
+    # ponytail: buyer-fit is keyword-graded; semantic buyer matching needs richer evidence than pages usually carry
     try:
         return CompiledTarget.model_validate(spec).model_dump()
     except Exception:
@@ -78,15 +87,22 @@ def _coerce_spec(raw: object) -> dict | None:
 
 
 def compile_node(state: S) -> dict:
+    business = state.get("business") or {}
+    seller = " ".join("%s: %s" % (k, v) for k, v in
+                      (("business", business.get("business_name", "")),
+                       ("sells", business.get("sells", "")),
+                       ("ideal buyer", business.get("ideal_buyer", ""))) if v).strip()
     prompt = ("Extract the lead target as ONE JSON object with exactly these keys:"
               ' {"geography": str, "industry": str, "size_min": int|null, "size_max": int|null,'
               ' "signals": [str], "exclusions": [str], "criteria": [str, ...]}.'
               ' criteria = short testable requirements, e.g. ["located in Ahmedabad, India",'
-              ' "operates in bakery"]. Unknown fields become "" or []. Request: ' + state["request"])
+              ' "operates in bakery"]. Unknown fields become "" or [].'
+              + (" Seller context (adds buyer-fit criteria only): " + seller if seller else "")
+              + " Request: " + state["request"])
     for attempt in range(2):
         try:
             spec = _coerce_spec(llm.chat_json("Return ONLY the JSON object.", prompt,
-                                              chain=_chain_of(state)))
+                                              chain=_chain_of(state)), business)
         except Exception:
             spec = None
         if spec and spec["criteria"]:
@@ -333,12 +349,18 @@ def _app():
 
 
 def run_prospect(request: str, desired_count: int = 20, output_format: str = "csv",
-                 llm_chain: list | None = None) -> dict:
+                 llm_chain: list | None = None, business_context: dict | None = None) -> dict:
     """End-to-end run. Thread id = request hash, so reruns resume from checkpoint + cache."""
     from data.cache import make_key
-    config = {"configurable": {"thread_id": make_key("prospect", request, desired_count)}}
+    from engine.models import BusinessContext
+    try:
+        business = BusinessContext.model_validate(business_context or {}).model_dump()
+    except Exception:
+        business = BusinessContext().model_dump()
+    config = {"configurable": {"thread_id": make_key("prospect", request, desired_count, business)}}
     initial: S = {"request": request, "desired_count": desired_count,
-                  "output_format": output_format, "llm_chain": llm_chain or [], "steps": []}
+                  "output_format": output_format, "llm_chain": llm_chain or [],
+                  "business": business, "steps": []}
     with _app() as app:
         final = app.invoke(initial, config)
     if final.get("error"):
@@ -351,12 +373,18 @@ def run_prospect(request: str, desired_count: int = 20, output_format: str = "cs
 
 
 def stream_prospect(request: str, desired_count: int = 20, output_format: str = "csv",
-                    llm_chain: list | None = None):
+                    llm_chain: list | None = None, business_context: dict | None = None):
     """Yields real node-completion events ({node, steps}), then the final result dict. No fabricated progress."""
     from data.cache import make_key
-    config = {"configurable": {"thread_id": make_key("prospect", request, desired_count)}}
+    from engine.models import BusinessContext
+    try:
+        business = BusinessContext.model_validate(business_context or {}).model_dump()
+    except Exception:
+        business = BusinessContext().model_dump()
+    config = {"configurable": {"thread_id": make_key("prospect", request, desired_count, business)}}
     initial: S = {"request": request, "desired_count": desired_count,
-                  "output_format": output_format, "llm_chain": llm_chain or [], "steps": []}
+                  "output_format": output_format, "llm_chain": llm_chain or [],
+                  "business": business, "steps": []}
     with _app() as app:
         for chunk in app.stream(initial, config):
             for node, update in chunk.items():

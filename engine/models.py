@@ -69,6 +69,14 @@ class TargetSpec(BaseModel):
     output_format: OutputFormat = OutputFormat.csv
 
 
+class BusinessContext(BaseModel):
+    """Optional seller profile. Sharpens criteria; never required, never invented from."""
+    business_name: str = Field(default="", max_length=200)
+    sells: str = Field(default="", max_length=500)
+    ideal_buyer: str = Field(default="", max_length=500)
+    dealbreakers: list[str] = Field(default=[], max_length=10)
+
+
 class CompiledTarget(BaseModel):
     """LLM-extracted spec, schema-validated. Empty strings = unknown, never guessed."""
     geography: str = ""

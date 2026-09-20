@@ -27,6 +27,11 @@
 <section>
 <h2>2. Target</h2>
 <textarea id="req" rows="4">Find 10 bakeries in Ahmedabad, India, in the food/bakery business.</textarea>
+<details><summary>Your business (optional — sharper buyer-fit when filled)</summary>
+<label>Business <input id="bname" placeholder="e.g. CrustEquip"></label>
+<label>You sell <input id="sells" placeholder="e.g. commercial ovens to bakeries"></label>
+<label>Ideal buyer <input id="buyer" placeholder="e.g. retail bakeries"></label>
+</details>
 <label>Count <input id="count" type="number" value="10" min="1" max="50"></label>
 <label><input type="radio" name="fmt" value="csv" checked> CSV</label>
 <label><input type="radio" name="fmt" value="json"> JSON</label>

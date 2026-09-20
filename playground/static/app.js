@@ -27,7 +27,8 @@ document.getElementById("run").onclick = async ()=>{
   steps.innerHTML = ""; leads.innerHTML = ""; conflicts.innerHTML = ""; dl.style.display = "none";
   const fmt = document.querySelector('input[name=fmt]:checked').value;
   const res = await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({session_id:sid,request:req.value,desired_count:+count.value,output_format:fmt})});
+    body:JSON.stringify({session_id:sid,request:req.value,desired_count:+count.value,output_format:fmt,
+      business_context:{business_name:bname.value,sells:sells.value,ideal_buyer:buyer.value}})});
   if(!res.ok){ steps.innerHTML = "<li>error starting run</li>"; return; }
   const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
   while(true){ const {done,value} = await reader.read(); if(done) break; buf += dec.decode(value,{stream:true});

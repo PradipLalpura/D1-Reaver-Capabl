@@ -248,12 +248,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(409, {"ok": False, "error": "session busy"})
         try:
             chain = [session["primary"], session["fallback"]]
+            business = body.get("business_context") if isinstance(body, dict) else None
+            events = stream_prospect(request, desired, output_format, llm_chain=chain,
+                                     business_context=business if isinstance(business, dict) else {})
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Accel-Buffering", "no")
             self.end_headers()
-            for event in stream_prospect(request, desired, output_format, llm_chain=chain):
+            for event in events:
                 node, result = event.get("node"), event.get("result")
                 if result is not None and result.get("ok"):
                     token = secrets.token_urlsafe(24)

@@ -44,8 +44,13 @@ def _leads(raw: object, tool: str) -> tuple[list[LeadRecord] | None, dict | None
 
 
 @mcp.tool()
-def prospect(request: str, desired_count: int = 20, output_format: str = "csv") -> dict:
-    """End-to-end NL request → qualified leads. WIRED (Phase 3, LangGraph)."""
+def prospect(request: str, desired_count: int = 20, output_format: str = "csv",
+             business_context: dict = {}) -> dict:
+    """End-to-end NL request → qualified leads. WIRED (Phase 3, LangGraph).
+
+    business_context is optional but sharpens results: {business_name, sells,
+    ideal_buyer, dealbreakers[]}. Unknown keys dropped, lengths capped.
+    """
     try:
         spec = TargetSpec(request=request, desired_count=desired_count)
     except ValidationError:
@@ -54,7 +59,8 @@ def prospect(request: str, desired_count: int = 20, output_format: str = "csv") 
         return _err("prospect", "output_format must be csv or json")
     from agent.graph import run_prospect
     try:
-        return run_prospect(spec.request, spec.desired_count, output_format)
+        return run_prospect(spec.request, spec.desired_count, output_format,
+                            business_context=business_context or {})
     except Exception:
         return _err("prospect", "run failed; retry or narrow the request")
 

@@ -167,6 +167,24 @@ def main() -> None:
     check("summaries carry conflicting values", summary["values"] == ["120", "400"])
     check("router stats recorded", isinstance(router.last_stats(), dict))
 
+    from agent.graph import _coerce_spec
+    from engine.models import BusinessContext
+    plain = _coerce_spec({"geography": "Ahmedabad, India", "industry": "bakery", "criteria": []})
+    check("spec fills missing criteria",
+          plain is not None and len(plain["criteria"]) == 2)
+    boosted = _coerce_spec({"geography": "Ahmedabad, India", "industry": "bakery", "criteria": []},
+                           {"ideal_buyer": "retail bakeries", "dealbreakers": ["chains"]})
+    check("business context sharpens criteria",
+          boosted is not None and any("serves retail bakeries" in c for c in boosted["criteria"])
+          and any("must not be chains" in c for c in boosted["criteria"]))
+    check("junk business dropped",
+          _coerce_spec({"criteria": ["located in India"]}, {"ideal_buyer": 123}) is not None)
+    try:
+        BusinessContext(business_name="x" * 500)
+        check("business model caps lengths", False)
+    except ValidationError:
+        check("business model caps lengths", True)
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 
