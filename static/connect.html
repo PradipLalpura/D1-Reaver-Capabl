@@ -41,7 +41,8 @@
 <h2 class="sec">2 · Pick your host</h2>
 <div class="hosts" id="host-pick">
 <button class="host on" data-g="g-chatgpt" type="button">ChatGPT</button>
-<button class="host" data-g="g-claude" type="button">Claude Desktop</button>
+<button class="host" data-g="g-claude" type="button">Claude (web)</button>
+<button class="host" data-g="g-desktop" type="button">Claude Desktop</button>
 <button class="host" data-g="g-code" type="button">Claude Code</button>
 <button class="host" data-g="g-opencode" type="button">OpenCode</button>
 <button class="host" data-g="g-cursor" type="button">Cursor</button>
@@ -52,12 +53,19 @@
 <div class="guide on" id="g-chatgpt"><div class="card"><h3>ChatGPT (remote, needs your token above)</h3>
 <ol><li>Open <b>Settings → Security and login → Developer mode ON</b>.</li>
 <li>Go to <b>chatgpt.com/plugins → +</b>, name it <b>reaver</b>.</li>
-<li>Connection URL: <b>https://reaver.antarik.co/mcp/</b> (+ token when asked).</li>
-<li>New chat → tools menu → attach reaver → ask: <i>"find 10 bakeries in Ahmedabad"</i>.</li></ol></div></div>
-<div class="guide" id="g-claude"><div class="card"><h3>Claude Desktop (local, no token)</h3>
+<li>Connection URL (clean, nothing appended): <b>https://reaver.antarik.co/mcp/</b></li>
+<li><b>Authentication: change "No Auth" → API Key</b> and paste your token. "No Auth" always fails — the server 401s keyless calls by design.</li>
+<li>Acknowledge the risk prompt → Create → new chat → attach reaver → ask: <i>"find 10 bakeries in Ahmedabad"</i>.</li></ol></div></div>
+<div class="guide" id="g-desktop"><div class="card"><h3>Claude Desktop (local, no token)</h3>
 <ol><li>Download your ready config: <button id="dl-desktop" type="button" class="btn small">Download config</button></li>
-<li>Claude <b>Settings → Connectors → Import</b> the file (or paste into <b>claude_desktop_config.json</b>).</li>
+<li>Claude <b>Settings → Connectors → Add MCP server</b> (or paste into <b>claude_desktop_config.json</b>).</li>
 <li><b>Restart Claude Desktop</b> → chat normally; REAVER tools appear.</li></ol></div></div>
+<div class="guide" id="g-claude"><div class="card"><h3>Claude web app (no OAuth needed)</h3>
+<ol><li>Go to <b>Customize → Connectors → Add custom connector</b>.</li>
+<li>Paste the server URL: <b>https://reaver.antarik.co/mcp/</b></li>
+<li>Choose auth <b>None</b>, then add your token under <b>Request headers</b> as
+<b>Authorization: Bearer &lt;token&gt;</b> (per Anthropic's own field guide for API-key servers).</li>
+<li>Click <b>Add → Connect</b>. No sign-in flow appears — that is correct for key auth.</li></ol></div></div>
 <div class="guide" id="g-code"><div class="card"><h3>Claude Code (one line)</h3>
 <ol><li>Open a terminal in the REAVER folder.</li>
 <li>Run: <b>python scripts/setup_mcp.py --install claude-code</b></li>
