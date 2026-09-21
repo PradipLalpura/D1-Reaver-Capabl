@@ -257,6 +257,11 @@ def main() -> None:
     except ValidationError:
         check("business model caps lengths", True)
 
+    import scripts.setup_mcp as _setup
+    check("12 hosts printable",
+          len(_setup.HOSTS) == 12 and all(_setup._print(h).strip() for h in _setup.HOSTS))
+    check("kimi uses stdio transport", "--transport stdio" in _setup._print("kimi"))
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

@@ -151,13 +151,16 @@ class Handler(BaseHTTPRequestHandler):
             from mesh.doctor import registry
             from mesh.router import last_stats
             from connectors.keys import keys, KEY_NAMES
+            from provider.llm import KEY_NAMES_LLM
             stats = last_stats()
             out = []
             for entry in registry():
                 present = bool(keys(*KEY_NAMES.get(entry["name"], ()))) if entry["name"] in KEY_NAMES else None
                 out.append({**entry, "key_present": present,
                             "last": stats.get(entry["name"], {"status": "UNTESTED"})})
-            return self._json(200, {"ok": True, "sources": out})
+            providers = [{"name": name, "key_present": bool(keys(*knames))}
+                         for name, knames in KEY_NAMES_LLM.items()]
+            return self._json(200, {"ok": True, "sources": out, "providers": providers})
         if path.startswith("/api/download/"):
             return self._download(path.rsplit("/", 1)[-1])
         if path.startswith("/static/"):

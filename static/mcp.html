@@ -39,6 +39,9 @@ pre{position:relative;background:#05090f;border:1px solid var(--line);padding:18
 <button class="tab on" data-pane="p-claude">Claude Code</button>
 <button class="tab" data-pane="p-desktop">Claude Desktop</button>
 <button class="tab" data-pane="p-opencode">OpenCode</button>
+<button class="tab" data-pane="p-kimi">Kimi CLI</button>
+<button class="tab" data-pane="p-mcode">MiniMax</button>
+<button class="tab" data-pane="p-cursor">Cursor</button>
 <button class="tab" data-pane="p-chatgpt">ChatGPT</button>
 <button class="tab" data-pane="p-api">Claude API</button>
 <button class="tab" data-pane="p-inspector">Inspector</button>
@@ -64,7 +67,30 @@ pre{position:relative;background:#05090f;border:1px solid var(--line);padding:18
     }
   }
 }</code><button class="copy">Copy</button></pre>
-<p style="color:var(--muted)">In <b>opencode.json</b>. Tools appear in-session with zero restarts of your workflow.</p></div>
+<p style="color:var(--muted)">In <b>opencode.json</b>. Or one command: <b>python scripts/setup_mcp.py --install HOST</b> for any host below.</p></div>
+<div class="pane" id="p-kimi"><pre><code>kimi mcp add --transport stdio reaver -- python -m reaver_mcp.server --transport stdio
+kimi mcp list   # verify</code><button class="copy">Copy</button></pre>
+<p style="color:var(--muted)">Kimi Code CLI is a full MCP client (stdio/HTTP/SSE). Run from the repo root.</p></div>
+<div class="pane" id="p-mcode"><pre><code># ~/.minimax/mcp.json
+{
+  "mcpServers": {
+    "reaver": {
+      "command": "python",
+      "args": ["-m", "reaver_mcp.server", "--transport", "stdio"]
+    }
+  }
+}</code><button class="copy">Copy</button></pre>
+<p style="color:var(--muted)">MiniMax Agent/Code reads <b>~/.minimax/mcp.json</b> (GUI form mode works too). Verify: <b>mcode mcp list</b>.</p></div>
+<div class="pane" id="p-cursor"><pre><code># ~/.cursor/mcp.json  (Windsurf: ~/.codeium/windsurf/mcp_config.json — same shape)
+{
+  "mcpServers": {
+    "reaver": {
+      "command": "python",
+      "args": ["-m", "reaver_mcp.server", "--transport", "stdio"]
+    }
+  }
+}</code><button class="copy">Copy</button></pre>
+<p style="color:var(--muted)">Cursor, Windsurf, and Cline share the <b>mcpServers</b> shape. Codex uses <b>~/.codex/config.toml</b> instead — see the installer.</p></div>
 <div class="pane" id="p-chatgpt"><pre><code># 1. expose with a token (refuses public binds without one)
 python -m reaver_mcp.server --transport http --host 0.0.0.0 --port 8000
 
