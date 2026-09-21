@@ -1,0 +1,27 @@
+1
+00:00:02,000 --> 00:00:06,000
+Every sales team lives this nightmare.
+
+2
+00:00:08,000 --> 00:00:15,000
+Forty tabs. Three hundred so-called leads. And I still don't know which ten are real.
+
+3
+00:00:20,000 --> 00:00:38,000
+Manual prospecting eats thirty hours a week. Gut-feel scoring. Fake data. And the tools? Built for one industry, one country — and they never tell you WHY a lead qualifies.
+
+4
+00:00:44,000 --> 00:00:58,000
+Meet Reaver. One autonomous agent that turns plain words into verified, qualified, deduplicated leads. Any industry. Any geography. Any legitimate target.
+
+5
+00:01:04,000 --> 00:01:58,000
+Watch. One sentence in. Behind it: eleven routed sources, robots-gated research, Apollo enrichment, code-graded verdicts — PASS, FAIL, or UNKNOWN. Twenty asked, twenty answered or honestly shortfalled. Here is the CSV.
+
+6
+00:02:04,000 --> 00:02:28,000
+Every verdict cites its evidence. Conflicts surface side by side — never averaged into fake certainty. Missing evidence is declared missing. This is what explainable AI actually means.
+
+7
+00:02:34,000 --> 00:02:58,000
+One engine, every arena — ChatGPT, Claude, OpenCode, or your own keys in the Playground. Reaver: CSV or JSON out. Truth throughout.
