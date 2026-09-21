@@ -93,7 +93,9 @@ MVP — the file is the handoff, and it imports without column edits.
 ## Docs
 
 - Product/architecture brief: `D1_Universal_Lead_Intelligence_MCP_Ideation.md`
-- Build plan + changelog: `PHASES.md`
+- Build plan + changelog: `PHASES.md`, universal sequel: `PHASES_UNIVERSAL.md`
+- User docs (canonical): `/mcp-docs` — setup per host, tool reference, troubleshooting
+- Zero-terminal onboarding: `/connect` — token issuance + GUI guides
 
 ## Deploy (single domain: Vercel static + Railway Python)
 

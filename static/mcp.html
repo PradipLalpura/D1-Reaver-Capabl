@@ -32,6 +32,14 @@ pre{position:relative;background:#05090f;border:1px solid var(--line);padding:18
 
 <h1 style="font-family:var(--disp);font-size:clamp(36px,7vw,84px);text-transform:uppercase">The <span style="color:var(--gold)">Arsenal</span></h1>
 <p style="color:var(--muted);max-width:64ch">Ten lead-intelligence weapons behind one MCP server. Your host thinks — REAVER strikes. <span id="live"></span></p>
+<p style="color:var(--muted);max-width:64ch">MCP (Model Context Protocol) is the open standard for plugging tools into AI apps.
+REAVER speaks it natively: <b>stdio</b> for everything on your machine, <b>streamable HTTP + bearer token</b>
+for everything remote. No accounts, no dashboard, no second implementation — the Playground above runs these same ten tools.</p>
+
+<section class="block" id="matrix">
+<h2 class="sec">0 · Host matrix</h2>
+<div class="grid" id="host-matrix"></div>
+</section>
 
 <section class="block">
 <h2 class="sec">1 · Connect your host</h2>
@@ -134,7 +142,15 @@ python -m reaver_mcp.server --transport http --host 0.0.0.0 --port 8000
 <div class="card reveal"><h3>Port already bound</h3><p>A stale server is squatting (we've been bitten). Find it: <b>netstat -ano | findstr :8000</b>, kill the PID, restart.</p></div>
 <div class="card reveal"><h3>prospect fails at compile</h3><p>Free-tier LLM quota exhausts mid-day across providers. The run fails honestly — wait for reset or add a Cerebras/Mistral key.</p></div>
 <div class="card reveal"><h3>Empty pool / shortfall</h3><p>Sources genuinely exhausted after 3 waves. Narrow geography, loosen criteria, or retry — caches make reruns cheap.</p></div>
+<div class="card reveal"><h3>All providers 429/404</h3><p>Free-tier LLM drought (seen live). Runs fail honestly at compile — wait for reset or add a Cerebras/Mistral key. Nothing is fabricated to fill the gap.</p></div>
+<div class="card reveal"><h3>Stream dies through a proxy</h3><p>Multi-minute SSE/MCP streams can truncate behind proxies. Bypass with direct subdomains to the Python services — DNS-only fix, no code change.</p></div>
 </div>
+</section>
+
+<section class="block" style="text-align:center">
+<h2 class="big">No terminal?<br>No problem.</h2>
+<p style="color:var(--muted)">Get a capped token with one click and follow GUI-only guides for every host.</p>
+<p><a class="btn" href="/connect">Connect without terminal</a></p>
 </section>
 <footer>REAVER MCP · ten tools, one engine · <a href="/">home</a></footer>
 </main>
