@@ -295,10 +295,11 @@ def main() -> None:
         if requires_token(args.host) and not args.token:
             parser.error("non-loopback bind requires --token (or REAVER_MCP_TOKEN)")
         import uvicorn
+        import urllib.parse
         app = mcp.streamable_http_app()
         if args.token:
             from starlette.middleware.base import BaseHTTPMiddleware
-            from starlette.responses import JSONResponse
+            from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
             from starlette.routing import Route
 
             token = args.token
@@ -311,19 +312,121 @@ def main() -> None:
                 return (scheme + "://" + host).rstrip("/")
 
             async def _resource_metadata(request):
-                # Honest RFC 9728 document: tokens are issued out-of-band (/connect page),
-                # so no authorization_servers are advertised — clients send a static bearer.
+                # RFC 9728: advertises OUR authorization server so ChatGPT can run OAuth.
+                base = _public_base(request)
                 return JSONResponse({
-                    "resource": _public_base(request) + "/mcp/",
+                    "resource": base + "/mcp/",
+                    "authorization_servers": [base],
+                    "scopes_supported": [],
                     "bearer_methods_supported": ["header"],
-                    "documentation": _public_base(request).replace("/mcp", "") + "/mcp-docs",
+                    "documentation": base + "/mcp-docs",
                 })
 
+            async def _as_metadata(request):
+                # RFC 8414 authorization-server metadata (CIMD + DCR, PKCE S256, iss echo).
+                base = _public_base(request)
+                return JSONResponse({
+                    "issuer": base,
+                    "authorization_endpoint": base + "/oauth/authorize",
+                    "token_endpoint": base + "/oauth/token",
+                    "registration_endpoint": base + "/oauth/register",
+                    "response_types_supported": ["code"],
+                    "grant_types_supported": ["authorization_code", "refresh_token"],
+                    "code_challenge_methods_supported": ["S256"],
+                    "token_endpoint_auth_methods_supported": ["none"],
+                    "client_id_metadata_document_supported": True,
+                    "authorization_response_iss_parameter_supported": True,
+                })
+
+            async def _register(request):
+                import json
+                from auth import oauth
+                try:
+                    body = json.loads((await request.body()).decode() or "{}")
+                except ValueError:
+                    body = {}
+                uris = body.get("redirect_uris", [])
+                client_id, error = oauth.register_client(uris if isinstance(uris, list) else [])
+                if error:
+                    return JSONResponse({"error": error}, 400)
+                return JSONResponse({"client_id": client_id})
+
+            async def _authorize_get(request):
+                # Consent page: user pastes their /connect token, clicks Approve.
+                q = request.query_params
+                needed = ("client_id", "redirect_uri", "code_challenge")
+                if not all(q.get(k) for k in needed):
+                    return JSONResponse({"error": "invalid_request"}, 400)
+                from html import escape
+                hidden = "".join(
+                    '<input type="hidden" name="%s" value="%s">' % (k, escape(q.get(k, "")))
+                    for k in (*needed, "state", "resource"))
+                return HTMLResponse(
+                    "<!doctype html><html><body style='background:#070c16;color:#f4f6fb;font-family:sans-serif'>"
+                    "<main style='max-width:480px;margin:8vh auto;padding:24px'>"
+                    "<h1>Connect REAVER</h1>"
+                    "<p>ChatGPT is requesting access to your REAVER leads. Paste your "
+                    "token from the <b>/connect</b> page, then Approve. No password exists here.</p>"
+                    "<form method='post'>" + hidden +
+                    "<input name='user_token' placeholder='rvr_…' style='width:100%;padding:10px' required>"
+                    "<p><button name='decision' value='allow'>Approve</button> "
+                    "<button name='decision' value='deny'>Deny</button></p></form></main></body></html>")
+
+            async def _authorize_post(request):
+                from auth import oauth
+                form = dict(await request.form())
+                if form.get("decision") != "allow":
+                    return RedirectResponse(
+                        "%s?error=access_denied&state=%s" % (
+                            form.get("redirect_uri", ""), form.get("state", "")), 302)
+                code, error = oauth.authorize(
+                    form.get("client_id", ""), form.get("redirect_uri", ""),
+                    form.get("code_challenge", ""), form.get("resource", ""),
+                    form.get("user_token", ""))
+                if error:
+                    sep = "&" if "?" in form.get("redirect_uri", "") else "?"
+                    return RedirectResponse("%s%s%s%s%s%s%s" % (
+                        form.get("redirect_uri", ""), sep, "error=", error.split(":")[0],
+                        "&state=", form.get("state", ""), "&iss=", _public_base(request)), 302)
+                return RedirectResponse(
+                    "%s?code=%s&state=%s&iss=%s" % (
+                        form.get("redirect_uri", ""), code, form.get("state", ""),
+                        _public_base(request)), 302)
+
+            async def _token(request):
+                from auth import oauth
+                try:
+                    raw = (await request.body()).decode()
+                    form = dict(urllib.parse.parse_qsl(raw, keep_blank_values=True))
+                except Exception:
+                    return JSONResponse({"error": "invalid_request"}, 400)
+                grant = form.get("grant_type", "")
+                if grant == "authorization_code":
+                    result, error = oauth.exchange_code(
+                        form.get("code", ""), form.get("redirect_uri", ""),
+                        form.get("client_id", ""), form.get("code_verifier", ""))
+                elif grant == "refresh_token":
+                    result, error = oauth.exchange_refresh(form.get("refresh_token", ""))
+                else:
+                    return JSONResponse({"error": "unsupported_grant_type"}, 400)
+                if error:
+                    return JSONResponse({"error": error}, 400)
+                return JSONResponse(result)
+
             app.routes.append(Route("/.well-known/oauth-protected-resource", _resource_metadata))
+            app.routes.append(Route("/.well-known/oauth-authorization-server", _as_metadata))
+            app.routes.append(Route("/oauth/register", _register, methods=["POST"]))
+            app.routes.append(Route("/oauth/authorize", _authorize_get, methods=["GET"]))
+            app.routes.append(Route("/oauth/authorize", _authorize_post, methods=["POST"]))
+            app.routes.append(Route("/oauth/token", _token, methods=["POST"]))
+
+            PUBLIC_PATHS = ("/.well-known/oauth-protected-resource",
+                            "/.well-known/oauth-authorization-server",
+                            "/oauth/register", "/oauth/authorize", "/oauth/token")
 
             class BearerAuth(BaseHTTPMiddleware):
                 async def dispatch(self, request, call_next):
-                    if request.url.path == "/.well-known/oauth-protected-resource":
+                    if request.url.path in PUBLIC_PATHS:
                         return await call_next(request)
                     presented = (request.headers.get("authorization") or "")[7:] \
                         if request.headers.get("authorization", "").startswith("Bearer ") else ""
@@ -331,7 +434,9 @@ def main() -> None:
                         return await call_next(request)
                     try:
                         from engine.tokens import check
+                        from auth.oauth import verify_access
                         allowed, _ = check(presented)
+                        allowed = allowed or verify_access(presented)
                     except Exception:
                         allowed = False
                     if not allowed:

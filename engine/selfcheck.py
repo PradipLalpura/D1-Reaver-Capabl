@@ -276,6 +276,39 @@ def main() -> None:
     check("usage lists", any(r["label"] == "selfcheck" for r in _tusage()))
     del _os.environ["REAVER_DB"]
 
+    _os.environ["REAVER_DB"] = _os.path.join(_tf.mkdtemp(), "o.db")
+    from auth import oauth as _oa
+    check("PKCE S256 vector",
+          _oa.pkce_ok("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                      "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM") is True)
+    check("PKCE wrong fails", _oa.pkce_ok("nope", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM") is False)
+    cid, err = _oa.register_client(["https://chatgpt.com/connector/oauth/cb"])
+    check("DCR registers https", bool(cid) and not err)
+    check("DCR rejects http", _oa.register_client(["http://x.example/cb"])[0] is None)
+    parent = _tissue("oauth-parent", cap=50)
+    import base64 as _b64
+    import hashlib as _hl
+    verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    challenge = _b64.urlsafe_b64encode(_hl.sha256(verifier.encode()).digest()).decode().rstrip("=")
+    code, err = _oa.authorize(cid, "https://chatgpt.com/connector/oauth/cb",
+                              challenge, "https://x.example/mcp/", parent)
+    check("authorize binds live token", bool(code) and not err)
+    check("authorize rejects dead token",
+          _oa.authorize(cid, "https://chatgpt.com/connector/oauth/cb",
+                        challenge, "", "rvr_nope")[0] is None)
+    grant, err = _oa.exchange_code(code, "https://chatgpt.com/connector/oauth/cb", cid, verifier)
+    check("code exchange mints pair", bool(grant.get("access_token")) and bool(grant.get("refresh_token")))
+    check("access verifies", _oa.verify_access(grant["access_token"]) is True)
+    check("code single-use", _oa.exchange_code(
+        code, "https://chatgpt.com/connector/oauth/cb", cid, verifier)[0] == {})
+    check("wrong verifier denied", _oa.exchange_code(
+        code, "https://chatgpt.com/connector/oauth/cb", cid, "wrong")[0] == {})
+    rot, err = _oa.exchange_refresh(grant["refresh_token"])
+    check("refresh rotates", bool(rot.get("access_token")) and not err)
+    check("old refresh dies", _oa.exchange_refresh(grant["refresh_token"])[0] == {})
+    check("rotated access verifies", _oa.verify_access(rot["access_token"]) is True)
+    del _os.environ["REAVER_DB"]
+
     from data import cache as _cache
     from provider import llm as _llm
     real_list, real_get, real_put = _llm._list_models, _cache.get, _cache.put

@@ -44,8 +44,9 @@ def issue(label: str, cap: int = DEFAULT_CAP) -> str:
     return plaintext
 
 
-def check(token: str) -> tuple[bool, str]:
-    """(allowed, reason). Day rolls over automatically; revoked is forever."""
+def check(token: str, count: bool = True) -> tuple[bool, str]:
+    """(allowed, reason). Day rolls over automatically; revoked is forever.
+    count=False validates without burning quota (used by the OAuth consent step)."""
     digest = hashlib.sha256((token or "").encode()).hexdigest()
     con = _db()
     try:
@@ -62,8 +63,9 @@ def check(token: str) -> tuple[bool, str]:
             used = 0
         if used >= cap:
             return False, "daily cap exhausted"
-        con.execute("UPDATE tokens SET used = used + 1 WHERE h = ?", (digest,))
-        con.commit()
+        if count:
+            con.execute("UPDATE tokens SET used = used + 1 WHERE h = ?", (digest,))
+            con.commit()
         return True, label
     finally:
         con.close()
@@ -76,6 +78,18 @@ def revoke(label_or_prefix: str) -> int:
                           (label_or_prefix, label_or_prefix + "%"))
         con.commit()
         return cur.rowcount
+    finally:
+        con.close()
+
+
+def cap_of(digest: str) -> int:
+    """Cap lookup by stored hash (for OAuth binding). 0 = unknown/revoked."""
+    con = _db()
+    try:
+        row = con.execute("SELECT cap, revoked FROM tokens WHERE h = ?", (digest,)).fetchone()
+        if row is None or row[1]:
+            return 0
+        return row[0]
     finally:
         con.close()
 
