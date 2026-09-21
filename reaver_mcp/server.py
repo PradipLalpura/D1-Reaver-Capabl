@@ -299,11 +299,32 @@ def main() -> None:
         if args.token:
             from starlette.middleware.base import BaseHTTPMiddleware
             from starlette.responses import JSONResponse
+            from starlette.routing import Route
 
             token = args.token
 
+            def _public_base(request) -> str:
+                """Proxy-aware public origin for discovery documents (Railway/Vercel friendly)."""
+                headers = request.headers
+                scheme = headers.get("x-forwarded-proto", request.url.scheme)
+                host = headers.get("x-forwarded-host", request.headers.get("host", ""))
+                return (scheme + "://" + host).rstrip("/")
+
+            async def _resource_metadata(request):
+                # Honest RFC 9728 document: tokens are issued out-of-band (/connect page),
+                # so no authorization_servers are advertised — clients send a static bearer.
+                return JSONResponse({
+                    "resource": _public_base(request) + "/mcp/",
+                    "bearer_methods_supported": ["header"],
+                    "documentation": _public_base(request).replace("/mcp", "") + "/mcp-docs",
+                })
+
+            app.routes.append(Route("/.well-known/oauth-protected-resource", _resource_metadata))
+
             class BearerAuth(BaseHTTPMiddleware):
                 async def dispatch(self, request, call_next):
+                    if request.url.path == "/.well-known/oauth-protected-resource":
+                        return await call_next(request)
                     presented = (request.headers.get("authorization") or "")[7:] \
                         if request.headers.get("authorization", "").startswith("Bearer ") else ""
                     if presented and presented == token:
@@ -314,7 +335,10 @@ def main() -> None:
                     except Exception:
                         allowed = False
                     if not allowed:
-                        return JSONResponse({"error": "unauthorized"}, 401)
+                        # MCP-spec discovery: tell spec-compliant clients (ChatGPT) where auth lives
+                        meta = _public_base(request) + "/.well-known/oauth-protected-resource"
+                        return JSONResponse({"error": "unauthorized"}, 401, headers={
+                            "WWW-Authenticate": 'Bearer resource_metadata="%s"' % meta})
                     return await call_next(request)
 
             app.add_middleware(BearerAuth)
