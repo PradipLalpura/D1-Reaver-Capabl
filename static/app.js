@@ -44,7 +44,10 @@ document.getElementById("run").onclick = async ()=>{
 };
 function finish(ev){
   (ev.steps||[]).forEach(s=>{ if(![...steps.children].some(li=>li.textContent===s)){ const li=document.createElement("li"); li.textContent=s; steps.appendChild(li); } });
-  if(!ev.ok){ leads.innerHTML = "<p>failed: "+ev.error+"</p>"; return; }
+  if(!ev.ok){ const dead = /providers failed|brains unavailable|compile failed/i.test(ev.error||"");
+    leads.innerHTML = dead
+      ? "<div class='card'><b class='u'>Brains unavailable</b><p>All model providers are rate-limited or down right now — nothing was fabricated. Wait for quota reset or add a fresh key, then <b>Run</b> again (caches make retries cheap).</p><p><small>"+esc(ev.error)+"</small></p></div>"
+      : "<p>failed: "+esc(ev.error)+"</p>"; return; }
   if(ev.shortfall){ shortfall.innerHTML = "<p>⚠️ shortfall: "+ev.shortfall+" fewer than asked — "+esc(ev.shortfall_note)+"</p>"; }
   (ev.rejected||[]).forEach(r=>{ const d=document.createElement("div"); d.className="card";
     d.innerHTML = "<b class='d'>"+esc(r.state)+"</b> "+esc(r.name)+" <small>"+esc(r.domain)+"</small><p>"+esc((r.reasons||[]).join("; "))+"</p>"; rejected.appendChild(d); });

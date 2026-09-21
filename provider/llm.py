@@ -33,8 +33,64 @@ DEFAULT_MODEL = {
     "anthropic": "claude-haiku-4-5",
     "custom": "",
 }
-# ponytail: free-tier model IDs rot without notice (both defaults died once already);
-# env REAVER_PRIMARY_MODEL/_FALLBACK_MODEL overrides; a /models refresh belongs in Phase 7 doctor
+# ponytail: free-tier model IDs rot without notice (defaults died twice already);
+# env REAVER_PRIMARY_MODEL/_FALLBACK_MODEL overrides; live-list override below is the safety net
+MODELS_TTL = 7 * 24 * 3600
+JUNK_MODEL_HINTS = ("whisper", "guard", "tts", "embedding", "image", "moderation")
+
+
+def refresh_models(force: bool = False) -> dict[str, list[str]]:
+    """Live /models per keyed provider, cached 7d. Read-only, quota-trivial."""
+    from data import cache
+    out: dict[str, list[str]] = {}
+    for provider, key_names in KEY_NAMES_LLM.items():
+        if provider == "custom":
+            continue
+        keys_available = keys(*key_names)
+        if not keys_available:
+            continue
+        key = cache.make_key("models", provider)
+        hit = None if force else cache.get(key)
+        if isinstance(hit, list):
+            out[provider] = hit
+            continue
+        ids = _list_models(provider, keys_available[0])
+        if ids is not None:
+            cache.put(key, ids, MODELS_TTL)
+            out[provider] = ids
+    return out
+
+
+def _list_models(provider: str, key: str) -> list[str] | None:
+    urls = {
+        "groq": "https://api.groq.com/openai/v1/models",
+        "openrouter": "https://openrouter.ai/api/v1/models",
+        "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/models",
+        "openai": "https://api.openai.com/v1/models",
+        "anthropic": "https://api.anthropic.com/v1/models",
+    }
+    headers = {"Authorization": "Bearer " + key}
+    if provider == "anthropic":
+        headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+    res = http.call(urls[provider], headers=headers)
+    if res["http"] != 200:
+        return None
+    data = http.json_body(res) or {}
+    ids = [m.get("id", "") for m in data.get("data", []) if m.get("id")]
+    return ids or None
+
+
+def resolve_model(provider: str) -> str:
+    """Default model unless the live list proves it rotted — then best-effort pick, never a guess presented as fact."""
+    default = DEFAULT_MODEL.get(provider, "")
+    live = refresh_models().get(provider, [])
+    if not live or default in live or default.split("/")[-1] in [i.split("/")[-1] for i in live]:
+        return default
+    candidates = [i for i in live if not any(h in i.lower() for h in JUNK_MODEL_HINTS)]
+    preferred = [i for i in candidates if any(h in i.lower() for h in
+                 ("flash", "mini", "instruct", "8b", "20b", "32b", "haiku"))]
+    # ponytail: heuristic pick; wrong picks surface as honest provider errors, and env override always wins
+    return (preferred or candidates or [default])[0]
 
 
 class LLMError(Exception):
@@ -71,7 +127,7 @@ def _chain(explicit: list[tuple] | None = None) -> list[tuple]:
             provider = "openrouter"
         if provider not in PROVIDERS:
             continue
-        model = os.environ.get(prefix + "_MODEL", "").strip() or DEFAULT_MODEL[provider]
+        model = os.environ.get(prefix + "_MODEL", "").strip() or resolve_model(provider)
         key = os.environ.get(prefix + "_KEY", "").strip() or next(iter(keys(*KEY_NAMES_LLM[provider])), "")
         if key:
             out.append((provider, model, key, ""))

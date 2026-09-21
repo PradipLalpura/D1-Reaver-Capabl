@@ -276,6 +276,21 @@ def main() -> None:
     check("usage lists", any(r["label"] == "selfcheck" for r in _tusage()))
     del _os.environ["REAVER_DB"]
 
+    from data import cache as _cache
+    from provider import llm as _llm
+    real_list, real_get, real_put = _llm._list_models, _cache.get, _cache.put
+    _cache.get = lambda k: None
+    _cache.put = lambda k, v, ttl: None
+    try:
+        _llm._list_models = lambda p, k: ["openai/gpt-oss-20b", "whisper-large-v3"]
+        check("live default kept", _llm.resolve_model("groq") == "openai/gpt-oss-20b")
+        _llm._list_models = lambda p, k: ["some/new-chat-model", "whisper-large-v3"]
+        check("rotted default overridden", _llm.resolve_model("groq") == "some/new-chat-model")
+        _llm._list_models = lambda p, k: None
+        check("list failure falls back", _llm.resolve_model("groq") == "openai/gpt-oss-20b")
+    finally:
+        _llm._list_models, _cache.get, _cache.put = real_list, real_get, real_put
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 

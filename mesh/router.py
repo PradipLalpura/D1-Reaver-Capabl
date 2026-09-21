@@ -22,6 +22,7 @@ ROUTES = {
 
 METERED_BUDGET = {
     "apollo": int(os.environ.get("REAVER_APOLLO_BUDGET", "25")),
+    "hunter": int(os.environ.get("REAVER_HUNTER_BUDGET", "10")),
     "apify": int(os.environ.get("REAVER_APIFY_BUDGET", "5")),
 }
 

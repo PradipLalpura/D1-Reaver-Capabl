@@ -103,15 +103,19 @@ def compile_node(state: S) -> dict:
               ' "operates in bakery"]. Unknown fields become "" or [].'
               + (" Seller context (adds buyer-fit criteria only): " + seller if seller else "")
               + " Request: " + state["request"])
+    last_error = "unusable model output"
     for attempt in range(2):
         try:
             spec = _coerce_spec(llm.chat_json("Return ONLY the JSON object.", prompt,
                                               chain=_chain_of(state)), business)
-        except Exception:
+        except Exception as exc:
             spec = None
+            # provider failure strings carry only provider:model + http/json codes — safe to surface
+            last_error = str(exc)[:200] or "unusable model output"
         if spec and spec["criteria"]:
             return {**_step(state, "compile:ok"), "spec": spec, "error": ""}
-    return {**_step(state, "compile:failed"), "error": "target compile failed: unusable model output"}
+    return {**_step(state, "compile:failed"),
+            "error": "target compile failed (brains unavailable?): " + last_error}
 
 
 def plan_node(state: S) -> dict:
