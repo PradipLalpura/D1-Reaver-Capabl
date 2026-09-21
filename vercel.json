@@ -5,6 +5,7 @@
     { "source": "/favicon.ico", "destination": "/static/favicon.png" },
     { "source": "/playground", "destination": "https://web-production-33561.up.railway.app/playground" },
     { "source": "/mcp-docs", "destination": "/static/mcp.html" },
+    { "source": "/connect", "destination": "/static/connect.html" },
     { "source": "/api/:path*", "destination": "https://web-production-33561.up.railway.app/api/:path*" },
     { "source": "/mcp", "destination": "https://d1-reaver-capabl-production.up.railway.app/mcp/" },
     { "source": "/mcp/", "destination": "https://d1-reaver-capabl-production.up.railway.app/mcp/" },

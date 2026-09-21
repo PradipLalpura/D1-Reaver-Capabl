@@ -24,6 +24,7 @@ PROVIDERS = ("groq", "gemini", "openrouter", "openai", "anthropic", "custom")
 SESSIONS: dict[str, dict] = {}
 DOWNLOADS: dict[str, dict] = {}
 RUN_COUNT: dict[str, list[float]] = {}
+TOKEN_REQ: dict[str, list[float]] = {}
 GUARD = threading.Lock()
 
 # single source for UI assets: repo-root static/ (Vercel serves it, Python serves it locally)
@@ -143,6 +144,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._page("playground.html")
         if path == "/mcp-docs":
             return self._page("mcp.html")
+        if path == "/connect":
+            return self._page("connect.html")
         if path == "/favicon.ico":
             return self._brand("Favicon.png", "image/png")
         if path == "/img/logo":
@@ -200,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, name: str) -> None:
         import os
-        if name not in ("app.js", "site.js", "mcp.js", "style.css", "favicon.png", "logo.png"):
+        if name not in ("app.js", "site.js", "mcp.js", "connect.js", "style.css", "favicon.png", "logo.png"):
             if "text/html" in (self.headers.get("Accept") or ""):
                 return self._not_found_page()
             return self._json(404, {"ok": False, "error": "unknown path"})
@@ -244,8 +247,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._keys(body)
         if path == "/api/run":
             return self._run(body)
+        if path == "/api/token/request":
+            return self._issue_token(body)
         return self._json(404, {"ok": False, "error": "unknown path"})
 
+    def _issue_token(self, body: dict) -> None:
+        """Auto-issue, capped, shown once. 5 requests/day/IP keeps issuance abuse pocket-sized."""
+        from engine.tokens import DEFAULT_CAP, issue
+        now = time.time()
+        with GUARD:
+            window = [t for t in TOKEN_REQ.get(self.client_address[0], []) if now - t < 86400]
+            if len(window) >= 5:
+                TOKEN_REQ[self.client_address[0]] = window
+                return self._json(429, {"ok": False, "error": "too many token requests; try tomorrow"})
+            TOKEN_REQ[self.client_address[0]] = window + [now]
+        label = str(body.get("label", ""))[:80] or "website"
+        return self._json(200, {"ok": True, "token": issue(label),
+                                "cap_per_day": DEFAULT_CAP,
+                                "warning": "shown once — copy now"})
     def do_DELETE(self) -> None:  # noqa: N802
         if urlparse(self.path).path == "/api/session":
             body = self._body() or {}

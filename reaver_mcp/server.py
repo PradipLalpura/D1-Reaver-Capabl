@@ -304,7 +304,16 @@ def main() -> None:
 
             class BearerAuth(BaseHTTPMiddleware):
                 async def dispatch(self, request, call_next):
-                    if request.headers.get("authorization") != "Bearer " + token:
+                    presented = (request.headers.get("authorization") or "")[7:] \
+                        if request.headers.get("authorization", "").startswith("Bearer ") else ""
+                    if presented and presented == token:
+                        return await call_next(request)
+                    try:
+                        from engine.tokens import check
+                        allowed, _ = check(presented)
+                    except Exception:
+                        allowed = False
+                    if not allowed:
                         return JSONResponse({"error": "unauthorized"}, 401)
                     return await call_next(request)
 

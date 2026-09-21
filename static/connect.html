@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REAVER Connect — zero-terminal MCP access</title>
+<link rel="icon" href="/static/favicon.png" type="image/png">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.hosts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+.host{background:transparent;color:var(--muted);border:1px solid var(--line);padding:14px;font-size:13px;
+  letter-spacing:.1em;cursor:pointer;font-family:inherit;transition:all .25s;text-align:center}
+.host.on,.host:hover{border-color:var(--gold);color:var(--gold-hot);transform:translateY(-2px)}
+.guide{display:none}
+.guide.on{display:block;animation:fadein .4s}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.guide ol li{margin:10px 0;color:var(--muted);line-height:1.7}
+.guide ol li b{color:var(--ink)}
+#token-out{word-break:break-all;background:#05090f;border:1px dashed var(--gold);padding:14px;margin:12px 0;display:none}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="loader"><img src="/static/favicon.png" alt="REAVER"><div class="bar"><i></i></div><small id="forge-word">Heating</small></div>
+<main class="wrap">
+<nav class="nav"><img class="mark" src="/static/favicon.png" alt="REAVER mark"><b>Reaver</b><span class="sp"></span>
+<a class="link" href="/">Home</a><a class="link" href="/playground">Playground</a><a class="link" href="/mcp-docs">Docs</a><button class="theme-btn" data-theme-btn type="button">◐ Theme</button></nav>
+
+<h1 style="font-family:var(--disp);font-size:clamp(34px,6vw,72px);text-transform:uppercase">Connect <span style="color:var(--gold)">without terminal</span></h1>
+<p style="color:var(--muted);max-width:62ch">Pick your host. GUI people get clicks; terminal people get one-liners. Remote hosts need a token — take one below, no account, no CLI.</p>
+
+<section class="block">
+<h2 class="sec">1 · Get access</h2>
+<label>Label for your token <input id="tlabel" placeholder="e.g. Priya's ChatGPT" maxlength="80"></label>
+<button id="tget" type="button" class="btn">Get MCP access</button>
+<div id="token-out"></div>
+<p><small style="color:var(--muted)">Shown once · 500 requests/day · auto-expires never, revoked on abuse. Full reference: <a href="/mcp-docs">MCP docs</a>.</small></p>
+</section>
+
+<section class="block">
+<h2 class="sec">2 · Pick your host</h2>
+<div class="hosts" id="host-pick">
+<button class="host on" data-g="g-chatgpt" type="button">ChatGPT</button>
+<button class="host" data-g="g-claude" type="button">Claude Desktop</button>
+<button class="host" data-g="g-code" type="button">Claude Code</button>
+<button class="host" data-g="g-opencode" type="button">OpenCode</button>
+<button class="host" data-g="g-cursor" type="button">Cursor</button>
+<button class="host" data-g="g-kimi" type="button">Kimi CLI</button>
+<button class="host" data-g="g-minimax" type="button">MiniMax</button>
+</div>
+
+<div class="guide on" id="g-chatgpt"><div class="card"><h3>ChatGPT (remote, needs your token above)</h3>
+<ol><li>Open <b>Settings → Security and login → Developer mode ON</b>.</li>
+<li>Go to <b>chatgpt.com/plugins → +</b>, name it <b>reaver</b>.</li>
+<li>Connection URL: <b>https://reaver.antarik.co/mcp/</b> (+ token when asked).</li>
+<li>New chat → tools menu → attach reaver → ask: <i>"find 10 bakeries in Ahmedabad"</i>.</li></ol></div></div>
+<div class="guide" id="g-claude"><div class="card"><h3>Claude Desktop (local, no token)</h3>
+<ol><li>Download your ready config: <button id="dl-desktop" type="button" class="btn small">Download config</button></li>
+<li>Claude <b>Settings → Connectors → Import</b> the file (or paste into <b>claude_desktop_config.json</b>).</li>
+<li><b>Restart Claude Desktop</b> → chat normally; REAVER tools appear.</li></ol></div></div>
+<div class="guide" id="g-code"><div class="card"><h3>Claude Code (one line)</h3>
+<ol><li>Open a terminal in the REAVER folder.</li>
+<li>Run: <b>python scripts/setup_mcp.py --install claude-code</b></li>
+<li>Verify: <b>python scripts/setup_mcp.py --check</b> → 10 live tools.</li></ol></div></div>
+<div class="guide" id="g-opencode"><div class="card"><h3>OpenCode (one line)</h3>
+<ol><li>Open a terminal in the REAVER folder.</li>
+<li>Run: <b>python scripts/setup_mcp.py --install opencode</b></li>
+<li>Restart your OpenCode session.</li></ol></div></div>
+<div class="guide" id="g-cursor"><div class="card"><h3>Cursor (config file)</h3>
+<ol><li>Download your ready config: <button id="dl-cursor" type="button" class="btn small">Download config</button></li>
+<li>Cursor Settings → <b>MCP → Add</b> → paste the file content (or save as <b>~/.cursor/mcp.json</b>).</li>
+<li>Restart Cursor.</li></ol></div></div>
+<div class="guide" id="g-kimi"><div class="card"><h3>Kimi CLI (one line)</h3>
+<ol><li>Run: <b>kimi mcp add --transport stdio reaver -- python -m reaver_mcp.server --transport stdio</b></li>
+<li>Verify: <b>kimi mcp list</b>.</li></ol></div></div>
+<div class="guide" id="g-minimax"><div class="card"><h3>MiniMax Agent (config file)</h3>
+<ol><li>Download your ready config: <button id="dl-minimax" type="button" class="btn small">Download config</button></li>
+<li>Save as <b>~/.minimax/mcp.json</b> (or use the app's GUI form mode with the same values).</li>
+<li>Verify: <b>mcode mcp list</b>.</li></ol></div></div>
+</section>
+<footer>Tokens are capped and revocable · keys never leave servers · <a href="/">home</a></footer>
+</main>
+<script src="/static/site.js"></script>
+<script src="/static/connect.js"></script>
+</body>
+</html>

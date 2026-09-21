@@ -262,6 +262,20 @@ def main() -> None:
           len(_setup.HOSTS) == 12 and all(_setup._print(h).strip() for h in _setup.HOSTS))
     check("kimi uses stdio transport", "--transport stdio" in _setup._print("kimi"))
 
+    import os as _os
+    import tempfile as _tf
+    _os.environ["REAVER_DB"] = _os.path.join(_tf.mkdtemp(), "t.db")
+    from engine.tokens import check as _tcheck, issue as _tissue, revoke as _trevoke, usage as _tusage
+    token = _tissue("selfcheck", cap=2)
+    check("token issued once-shaped", token.startswith("rvr_") and len(token) > 20)
+    check("token checks true", _tcheck(token)[0] is True)
+    check("second use true", _tcheck(token)[0] is True)
+    check("cap trips", _tcheck(token) == (False, "daily cap exhausted"))
+    check("unknown rejected", _tcheck("rvr_nope") == (False, "unknown token"))
+    check("revoke works", _trevoke("selfcheck") == 1 and _tcheck(token)[0] is False)
+    check("usage lists", any(r["label"] == "selfcheck" for r in _tusage()))
+    del _os.environ["REAVER_DB"]
+
     print("SELFCHECK PASS %d/%d" % (_passed, _passed))
 
 
